@@ -242,3 +242,41 @@ class CausalCritic:
             "captured_errors": captured_errors,
             "causal_certifications": causal_certifications,
         }
+
+    def audit_confounders_and_marginal_attribution(
+        self,
+        identified_causes: List[str],
+        claimed_loss_allocations: Dict[str, float],
+        total_observed_loss: float,
+    ) -> Dict[str, Any]:
+        """Audits multi-cause scenarios against confounder traps and double-counting."""
+        sum_claimed = sum(claimed_loss_allocations.values())
+        has_double_counting = sum_claimed > (total_observed_loss * 1.05)
+        is_single_cause_fallacy = len(identified_causes) > 1 and len(claimed_loss_allocations) == 1
+
+        errors = []
+        if has_double_counting:
+            errors.append({
+                "error_type": "DOUBLE_COUNTING_FALLACY",
+                "detail": (
+                    f"Tổng tổn thất quy kết ({sum_claimed:,.2f}) vượt quá tổng tổn thất thực tế ({total_observed_loss:,.2f}). "
+                    "Thiếu trừ phần bù tương tác (Interaction Offset)."
+                ),
+            })
+        if is_single_cause_fallacy:
+            errors.append({
+                "error_type": "SINGLE_CAUSE_OVERSIMPLIFICATION",
+                "detail": (
+                    f"Báo cáo chỉ quy kết cho 1 nguyên nhân trong khi thực tế có {len(identified_causes)} sự cố "
+                    "đồng thời tác động lên cùng collider node."
+                ),
+            })
+
+        is_valid = len(errors) == 0
+        return {
+            "is_valid": is_valid,
+            "has_double_counting": has_double_counting,
+            "is_single_cause_fallacy": is_single_cause_fallacy,
+            "verdict": "CERTIFIED_MARGINAL_ATTRIBUTION" if is_valid else "REJECTED_AUDIT",
+            "audit_errors": errors,
+        }

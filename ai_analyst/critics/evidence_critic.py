@@ -334,3 +334,26 @@ class EvidenceCritic:
             "captured_errors": captured_errors,
             "approved_insights": approved_insights,
         }
+
+    def audit_noise_and_sample_size(
+        self,
+        sample_count: int,
+        p_value: float = 0.01,
+        hypothesis_summary: str = "",
+    ) -> Dict[str, Any]:
+        """Audits whether a worker hypothesis is based on statistical noise (small sample or high p-value)."""
+        is_noise = sample_count < 10 or p_value > 0.05
+        verdict = "REJECTED_AS_NOISE (Bác bỏ do nhiễu)" if is_noise else "CONFIRMED_EVIDENCE (Đủ căn cứ)"
+        refutation = (
+            f"Cỡ mẫu {sample_count} < 10 hoặc p-value {p_value:.4f} > 0.05 không đạt ý nghĩa thống kê 95%."
+            if is_noise
+            else f"Cỡ mẫu {sample_count} >= 10 và p-value {p_value:.4f} <= 0.05 đạt chuẩn bằng chứng thực nghiệm."
+        )
+        return {
+            "sample_count": sample_count,
+            "p_value": p_value,
+            "is_noise": is_noise,
+            "verdict": verdict,
+            "refutation": refutation,
+            "hypothesis": hypothesis_summary,
+        }

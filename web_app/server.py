@@ -597,6 +597,56 @@ def inject_stream_event(payload: StreamInjectPayload):
 
 
 # =============================================================================
+# Scenario Engine V2 API Endpoints (Concurrency, Noise, Marginal Attribution)
+# =============================================================================
+
+from web_app.services.scenario_v2_service import scenario_v2_service
+
+class ScenarioV2InjectPayload(BaseModel):
+    scenario_id: str = "S006"
+    progress_t: float = 0.65
+    apply_noise: bool = True
+    noise_level: float = 0.04
+
+
+@app.get("/api/scenarios/v2/catalog")
+def get_scenarios_v2_catalog():
+    """Returns the list of composite concurrent scenarios (V2)."""
+    catalog = scenario_v2_service.get_catalog()
+    return {
+        "status": "SUCCESS",
+        "catalog": catalog,
+        "total_scenarios": len(catalog),
+    }
+
+
+@app.post("/api/scenarios/v2/inject")
+def inject_scenario_v2(payload: ScenarioV2InjectPayload):
+    """Triggers dynamic simulation and injection of a V2 composite scenario."""
+    try:
+        result = scenario_v2_service.inject_composite_simulation(
+            scenario_id=payload.scenario_id,
+            progress_t=payload.progress_t,
+            apply_noise=payload.apply_noise,
+            noise_level=payload.noise_level,
+        )
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/scenarios/v2/attribution")
+def get_scenario_v2_attribution(scenario_id: str = "S006"):
+    """Returns AI vs Ground Truth marginal attribution comparison."""
+    try:
+        return scenario_v2_service.get_attribution_comparison(scenario_id=scenario_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # Natural Language AI Assistant API Endpoints
 # =============================================================================
 

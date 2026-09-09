@@ -381,3 +381,57 @@ class BusinessHeartbeatDetector:
             "anomalies_detected": enriched_anomalies,
             "summary_by_domain": {d: len(items) for d, items in domain_anomalies.items()},
         }
+
+    def evaluate_noise_resilience(
+        self,
+        sample_value: float,
+        baseline_mean: float,
+        baseline_std: float,
+        sample_size: int = 10,
+    ) -> Dict[str, Any]:
+        """Evaluates if metric deviation is statistically significant or merely business noise."""
+        if baseline_std <= 1e-6:
+            z_score = 0.0
+        else:
+            z_score = (sample_value - baseline_mean) / baseline_std
+
+        # Critical threshold at 99% confidence (Z > 2.58) and minimum sample size 10
+        is_significant = abs(z_score) >= 2.576 and sample_size >= 10
+        return {
+            "sample_value": sample_value,
+            "baseline_mean": baseline_mean,
+            "z_score": round(z_score, 4),
+            "sample_size": sample_size,
+            "is_noise": not is_significant,
+            "confidence_level": "99%" if abs(z_score) >= 2.576 else "Below 99%",
+            "verdict": "CONFIRMED_ANOMALY" if is_significant else "FILTERED_NOISE",
+        }
+
+    def detect_composite_concurrency(self) -> Dict[str, Any]:
+        """Detects whether multiple concurrent anomalies indicate a composite scenario (V2)."""
+        scan = self.run_full_scan()
+        anomalies = scan["anomalies_detected"]
+        domains = set(a["domain"] for a in anomalies)
+
+        # Check S006 signature: Supply and Payment simultaneously
+        is_s006 = ("Supply Chain" in domains or "Procurement" in domains) and "Payment Systems" in domains
+        # Check S007 signature: Logistics and Customer/Product simultaneously
+        is_s007 = "Logistics & Carrier SLAs" in domains and (
+            "Customer Experience & Quality" in domains or "Product" in domains
+        )
+
+        composite_type = None
+        if is_s006:
+            composite_type = "S006_DUAL_SHOCK_SUPPLY_PAYMENT"
+        elif is_s007:
+            composite_type = "S007_LOGISTICS_AND_QUALITY_CLASH"
+        elif len(domains) >= 2:
+            composite_type = "MULTI_DOMAIN_CONCURRENCY"
+
+        return {
+            "total_active_anomalies": len(anomalies),
+            "active_domains": list(domains),
+            "is_composite": composite_type is not None,
+            "composite_type": composite_type,
+            "anomalies": anomalies,
+        }

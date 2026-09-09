@@ -2737,6 +2737,117 @@ window.handleSendQuery = handleSendQuery;
 window.applySuggestion = applySuggestion;
 window.copySqlToClipboard = copySqlToClipboard;
 window.rerunSqlQuery = rerunSqlQuery;
+// =============================================================================
+// Module 9: Scenario Engine V2 (Concurrency, Noise, Marginal Attribution)
+// =============================================================================
+
+function updateScenarioV2Meta() {
+  const sel = document.getElementById('v2-scenario-select');
+  const hint = document.getElementById('v2-scenario-hint');
+  if (!sel || !hint) return;
+  if (sel.value === 'S006') {
+    hint.textContent = 'Đứt gãy nguồn cung linh kiện Viet Electronics + Sập cổng MoMo.';
+  } else {
+    hint.textContent = 'Quá tải & đình công đơn vị vận chuyển GHN + Lỗi phần cứng Eco Laptop 072.';
+  }
+}
+
+function updateV2ProgressLabel(val) {
+  const lbl = document.getElementById('val-v2-phase');
+  if (!lbl) return;
+  const num = parseFloat(val);
+  let phase = 'PEAK_CRISIS';
+  if (num < 0.20) phase = 'INCUBATION';
+  else if (num < 0.55) phase = 'ESCALATION';
+  else if (num < 0.80) phase = 'PEAK_CRISIS';
+  else phase = 'DECAY_RECOVERY';
+  lbl.textContent = `${phase} (${Math.round(num * 100)}%)`;
+}
+
+async function runScenarioV2Simulation() {
+  const scenarioId = document.getElementById('v2-scenario-select')?.value || 'S006';
+  const progressT = parseFloat(document.getElementById('v2-progress-slider')?.value || '0.70');
+  const noiseLevel = parseFloat(document.getElementById('v2-noise-slider')?.value || '0.04');
+  const btn = document.getElementById('btn-run-v2-sim');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/scenarios/v2/inject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario_id: scenarioId,
+        progress_t: progressT,
+        apply_noise: true,
+        noise_level: noiseLevel,
+      }),
+    });
+    const data = await res.json();
+    if (data.status === 'SUCCESS') {
+      renderScenarioV2Result(data);
+      showToastNotification(`⚡ Mô phỏng ${scenarioId} kích hoạt thành công (${data.temporal_state.phase})!`, 'success');
+    } else {
+      showToastNotification('Lỗi mô phỏng: ' + (data.detail || data.message), 'error');
+    }
+  } catch (err) {
+    showToastNotification('Lỗi kết nối Scenario V2 API: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderScenarioV2Result(data) {
+  const titleEl = document.getElementById('v2-res-title');
+  const lossEl = document.getElementById('v2-res-loss');
+  const gridEl = document.getElementById('v2-attribution-grid');
+  if (!titleEl || !lossEl || !gridEl) return;
+
+  titleEl.textContent = `${data.title} [Pha: ${data.temporal_state.phase}]`;
+  const currLoss = data.surface_observation?.estimated_current_loss_vnd || 0;
+  lossEl.textContent = `Tổn thất ước tính: ${currLoss.toLocaleString('vi-VN')} ₫`;
+
+  const causes = data.ground_truth_hidden?.causes || [];
+  const interactionOffset = data.ground_truth_hidden?.interaction_offset_vnd || 0;
+  const shares = data.ai_synthesizer_rca?.marginal_attribution?.shares || {};
+
+  let html = causes.map((c) => {
+    const cid = c.cause_id;
+    const sharePct = (shares[cid] !== undefined ? shares[cid] * 100 : c.share_pct).toFixed(1);
+    const grossLoss = (c.gross_loss || 0).toLocaleString('vi-VN');
+    return `
+      <div style="background: rgba(30, 41, 59, 0.7); padding: 14px; border-radius: 8px; border-left: 4px solid #8b5cf6;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <strong style="color: #f8fafc; font-size: 0.92rem;">${cid}</strong>
+          <span style="background: rgba(139, 92, 246, 0.25); color: #c4b5fd; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">
+            ${sharePct}% Phân bổ
+          </span>
+        </div>
+        <p style="margin: 0 0 6px 0; font-size: 0.8rem; color: #94a3b8;">Tổn thất gộp: <strong style="color: #cbd5e1;">${grossLoss} ₫</strong></p>
+        <div style="background: rgba(15, 23, 42, 0.8); height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="background: linear-gradient(90deg, #8b5cf6, #ec4899); width: ${sharePct}%; height: 100%;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  html += `
+    <div style="background: rgba(30, 41, 59, 0.7); padding: 14px; border-radius: 8px; border-left: 4px solid #10b981;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <strong style="color: #34d399; font-size: 0.92rem;">Interaction Offset (Triệt tiêu Double-Counting)</strong>
+        <span style="color: #34d399; font-weight: 700; font-size: 0.85rem;">- ${interactionOffset.toLocaleString('vi-VN')} ₫</span>
+      </div>
+      <p style="margin: 0; font-size: 0.78rem; color: #94a3b8;">
+        Khấu trừ phương sai tương tác collider node: Bảo đảm tổng tổn thất phản ánh đúng thực tế, không bị đội khống cơ học.
+      </p>
+    </div>
+  `;
+
+  gridEl.innerHTML = html;
+}
+
+window.updateScenarioV2Meta = updateScenarioV2Meta;
+window.updateV2ProgressLabel = updateV2ProgressLabel;
+window.runScenarioV2Simulation = runScenarioV2Simulation;
 window.toggleSqlView = toggleSqlView;
 window.fetchStreamStatus = fetchStreamStatus;
 window.toggleStreamWorker = toggleStreamWorker;

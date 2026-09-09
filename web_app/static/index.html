@@ -981,7 +981,79 @@
         </div>
       </div>
 
-      <!-- SECTION D: DETAILED INCIDENTS REGISTRY (ACTIVE VS ARCHIVED) -->
+      <!-- SECTION D: SCENARIO LAB V2 - KHỦNG HOẢNG KÉP & PHÂN BỔ NHÂN QUẢ BIÊN -->
+      <div class="sim-sandbox-card glass-panel mb-4" id="scenario-lab-v2-section" style="border: 1px solid rgba(139, 92, 246, 0.35); background: linear-gradient(135deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.65));">
+        <div class="sim-header">
+          <div class="sim-title-group">
+            <span class="sim-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">🔬</span>
+            <div>
+              <h3 class="card-title text-purple" style="font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                Scenario Lab V2: Khủng hoảng Kép & Phân bổ Nhân quả Biên
+                <span class="subhead-badge" style="background: #7c3aed; color: #fff; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px;">CONCURRENCY V2</span>
+              </h3>
+              <p class="card-desc">Mô phỏng đa sự cố đồng thời, cường độ biến thiên theo 4 pha và đo lường khả năng kháng nhiễu của Hội đồng 6 Tác nhân AI</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-run-sim" id="btn-run-v2-sim" onclick="runScenarioV2Simulation()" style="background: linear-gradient(135deg, #7c3aed, #4f46e5);">
+              ⚡ Kích hoạt Mô phỏng V2
+            </button>
+          </div>
+        </div>
+
+        <!-- Controls: Scenario Picker, Progress slider, Noise slider -->
+        <div class="sim-controls-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+          <!-- Scenario selector -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge" style="background: #8b5cf6;">KỊCH BẢN</span>
+              <label class="sim-label">Lựa chọn Kịch bản Kép</label>
+            </div>
+            <select id="v2-scenario-select" class="range-slider" style="width: 100%; padding: 8px; background: rgba(15, 23, 42, 0.8); color: #fff; border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 6px; font-size: 0.88rem;" onchange="updateScenarioV2Meta()">
+              <option value="S006">S006 — Cú sốc Kép (Cung ứng + Ví MoMo)</option>
+              <option value="S007">S007 — Xung đột GHN & Lỗi Eco Laptop 072</option>
+            </select>
+            <p class="sim-hint" id="v2-scenario-hint" style="margin-top: 6px;">Đứt gãy nguồn cung linh kiện Viet Electronics + Sập cổng MoMo.</p>
+          </div>
+
+          <!-- Progress t slider -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge" style="background: #3b82f6;">TIẾN TRÌNH</span>
+              <label class="sim-label">Pha khủng hoảng: <strong id="val-v2-phase" class="text-cyan">PEAK_CRISIS (70%)</strong></label>
+            </div>
+            <p class="sim-hint">Ủ mầm (0-20%) &rarr; Leo thang &rarr; Đỉnh điểm (70%) &rarr; Hạ nhiệt</p>
+            <input type="range" id="v2-progress-slider" min="0.05" max="0.95" value="0.70" step="0.05" class="range-slider" oninput="updateV2ProgressLabel(this.value)">
+          </div>
+
+          <!-- Noise slider -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge" style="background: #f59e0b;">NHIỄU NGHIỆP VỤ</span>
+              <label class="sim-label">Độ nhiễu dữ liệu: <strong id="val-v2-noise" class="text-amber">4.0%</strong></label>
+            </div>
+            <p class="sim-hint">Trễ đồng bộ POS (6-18h), review 1 sao nhầm, dao động đo lường</p>
+            <input type="range" id="v2-noise-slider" min="0.00" max="0.12" value="0.04" step="0.01" class="range-slider" oninput="document.getElementById('val-v2-noise').textContent = (parseFloat(this.value)*100).toFixed(1) + '%'">
+          </div>
+        </div>
+
+        <!-- Simulation Result Container -->
+        <div id="v2-simulation-result" style="margin-top: 20px; padding: 16px; background: rgba(15, 23, 42, 0.6); border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.25);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="subhead-badge" style="background: #10b981; color: #fff;">MARGINAL ATTRIBUTION MATRIX</span>
+              <strong id="v2-res-title" style="color: #e2e8f0; font-size: 0.95rem;">Đang tải dữ liệu kịch bản...</strong>
+            </div>
+            <span id="v2-res-loss" style="color: #f43f5e; font-weight: 700; font-size: 1.05rem;">Thiệt hại ước tính: -- ₫</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;" id="v2-attribution-grid">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION E: DETAILED INCIDENTS REGISTRY (ACTIVE VS ARCHIVED) -->
       <div id="crisis-registry-wrapper">
         <!-- Zone 1: Active Real-Time Incidents -->
         <div class="active-incidents-section mb-4">
