@@ -32,6 +32,9 @@ dist/
 # Logs
 *.log
 
+# Scratch / temporary
+scratch/
+
 # OS
 .DS_Store
 Thumbs.db

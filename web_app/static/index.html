@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Digital Twin — Executive Command & AI Financial Intelligence</title>
+  <meta name="description" content="Nền tảng điều hành thông minh Enterprise Digital Twin tích hợp Báo cáo tài chính P&L, Chuỗi cung ứng, Quản trị sự cố và Trợ lý AI.">
+  
+  <!-- Typography: Google Fonts Inter, Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js local bundle for 100% offline & firewall safety -->
+  <script src="/static/chart.umd.js"></script>
+  
+  <!-- Custom Design System -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- =========================================================================
+       1. Top Executive Header Bar
+       ========================================================================= -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-badge">
+        <span class="pulse-indicator"></span>
+        <div>
+          <div class="brand-title">ENTERPRISE DIGITAL TWIN</div>
+          <div class="brand-sub">EXECUTIVE COMMAND CENTER &bull; OMNICORP V2</div>
+        </div>
+      </div>
+
+      <!-- Health Index Gauge Widget -->
+      <div class="health-gauge-pill" id="health-gauge-pill" title="Chỉ số sức khỏe vận hành tổng thể" onclick="switchTab('overview')">
+        <div class="gauge-ring-mini">
+          <svg viewBox="0 0 36 36" class="circular-chart">
+            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            <path id="gauge-progress" class="circle-bar warning" stroke-dasharray="62, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          </svg>
+          <span class="gauge-val" id="gauge-score-val">62</span>
+        </div>
+        <div class="gauge-meta">
+          <span class="gauge-title">HEALTH INDEX</span>
+          <span class="gauge-status badge-warning" id="gauge-status-label">CẢNH BÁO KHỦNG HOẢNG</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Timeframe Selector -->
+      <div class="timeframe-group">
+        <span class="tf-label">Kỳ quan sát:</span>
+        <div class="tf-buttons">
+          <button class="tf-btn active" data-tf="all" onclick="setTimeframe('all')">Toàn kỳ T8/2026</button>
+          <button class="tf-btn" data-tf="pre_crisis" onclick="setTimeframe('pre_crisis')">Trước sự cố (01-10)</button>
+          <button class="tf-btn" data-tf="peak_crisis" onclick="setTimeframe('peak_crisis')">Cao điểm (11-20)</button>
+          <button class="tf-btn" data-tf="recovery" onclick="setTimeframe('recovery')">Phục hồi (21-31)</button>
+        </div>
+      </div>
+
+      <!-- 24/7 Autonomous Sentinel Control Pill -->
+      <div class="sentinel-control-pill" id="sentinel-header-pill" title="24/7 Autonomous Sentinel: Giám sát nhịp tim doanh nghiệp liên tục">
+        <span class="sentinel-pulse active" id="sentinel-pulse-dot"></span>
+        <span class="sentinel-label" id="sentinel-status-text">SENTINEL 24/7: ACTIVE</span>
+        <span class="sentinel-timer" id="sentinel-countdown-text" title="Đếm lùi lần quét tiếp theo">60s</span>
+        <button id="btn-sentinel-scan" class="btn-sentinel-action" onclick="triggerSentinelScanNow()" title="Quét nhịp tim và chạy điều tra RCA ngay">
+          ⚡ Quét ngay
+        </button>
+        <button id="btn-sentinel-toggle" class="btn-sentinel-toggle" onclick="toggleSentinelWorker()" title="Bật/Tạm dừng giám sát tự động">
+          ⏸
+        </button>
+        <button id="btn-sentinel-logs" class="btn-sentinel-logs" onclick="openSentinelLogsModal()" title="Xem nhật ký giám sát & RCA của AI">
+          📋
+        </button>
+      </div>
+
+      <!-- Live Sync & Export Buttons -->
+      <button id="btn-sync-data" class="btn-tool-outline" onclick="triggerLiveSync()" title="Đồng bộ dữ liệu thời gian thực">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+        </svg>
+        <span id="sync-btn-text">Đồng bộ</span>
+      </button>
+
+      <button id="btn-export-pdf" class="btn-tool-outline" onclick="openExportModal()" title="Xuất báo cáo điều hành chuẩn C-Suite">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>
+        </svg>
+        <span>Xuất Báo cáo</span>
+      </button>
+
+      <button id="btn-quick-ai" class="btn-ai-glow" onclick="switchTab('ai-assistant')">
+        <svg class="ai-spark-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 2L14.4 7.6L20 10L14.4 12.4L12 18L9.6 12.4L4 10L9.6 7.6L12 2Z"/>
+        </svg>
+        Hỏi Trợ lý AI
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       2. Operational Emergency Alert Ticker
+       ========================================================================= -->
+  <div class="emergency-alert-ticker normal-state" id="alert-ticker">
+    <div class="ticker-badge" id="ticker-badge">
+      <span class="pulse-indicator-green" id="ticker-pulse"></span>
+      <strong id="ticker-badge-text">TRẠNG THÁI HỆ THỐNG:</strong>
+    </div>
+    <div class="ticker-content" id="ticker-scroll-content">
+      <span class="ticker-item"><strong class="text-emerald">[BÌNH THƯỜNG]</strong> Hệ thống vận hành ổn định &bull; Toàn bộ 5 sự cố lịch sử (S001 - S005) đã được giải quyết an toàn và lưu trữ</span>
+    </div>
+    <button class="btn-ticker-action" id="btn-ticker-action" onclick="switchTab('crisis-sim')">Hồ sơ Sự cố & Giả lập &rarr;</button>
+  </div>
+
+  <!-- =========================================================================
+       3. Main Navigation Tabs (6 Comprehensive Enterprise Pillars)
+       ========================================================================= -->
+  <nav class="nav-container">
+    <div class="tab-list" role="tablist">
+      <button id="tab-overview" class="tab-btn active" role="tab" onclick="switchTab('overview')">
+        <span class="tab-icon">📊</span>
+        <span>Tổng quan Điều hành</span>
+      </button>
+      <button id="tab-supply-chain" class="tab-btn" role="tab" onclick="switchTab('supply-chain')">
+        <span class="tab-icon">🏭</span>
+        <span>Kho vận & Chuỗi cung ứng</span>
+      </button>
+      <button id="tab-customer-growth" class="tab-btn" role="tab" onclick="switchTab('customer-growth')">
+        <span class="tab-icon">👥</span>
+        <span>Khách hàng & Tăng trưởng</span>
+      </button>
+      <button id="tab-finance" class="tab-btn" role="tab" onclick="switchTab('finance')">
+        <span class="tab-icon">💰</span>
+        <span>Tài chính & P&L</span>
+      </button>
+      <button id="tab-crisis-sim" class="tab-btn" role="tab" onclick="switchTab('crisis-sim')">
+        <span class="tab-icon">🚨</span>
+        <span>Khủng hoảng & Mô phỏng Số</span>
+        <span class="incident-badge-count" id="badge-incident-count">0</span>
+      </button>
+      <button id="tab-ai-assistant" class="tab-btn" role="tab" onclick="switchTab('ai-assistant')">
+        <span class="tab-icon">💬</span>
+        <span>Trợ lý AI Doanh nghiệp</span>
+        <span class="ai-chip">NL2SQL</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- =========================================================================
+       4. Viewport Panels
+       ========================================================================= -->
+  <main class="app-main">
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 1: EXECUTIVE OVERVIEW
+         ----------------------------------------------------------------------- -->
+    <section id="view-overview" class="view-panel active">
+      
+      <!-- =====================================================================
+           ENTERPRISE CONTINUOUS DATA STREAM COMMAND CENTER (REAL-TIME ENGINE)
+           ===================================================================== -->
+      <div class="stream-command-center glass-panel mb-4" id="stream-command-center">
+        <div class="scc-header">
+          <div class="scc-title-group">
+            <div class="scc-badge-wrap">
+              <span class="stream-pulse-dot" id="stream-pulse-indicator"></span>
+              <span class="stream-status-tag active" id="stream-status-badge">ĐANG CHẢY (SSE REAL-TIME)</span>
+            </div>
+            <div>
+              <h3 class="card-title">Hệ Tuần hoàn Dòng chảy Dữ liệu Doanh nghiệp (Enterprise Live Stream & Self-Healing Twin)</h3>
+              <p class="card-desc" id="stream-metrics-text">⚡ Đang nạp sự kiện 6 miền nghiệp vụ vào PostgreSQL • Vận tốc: 24.5 đơn/phút • SSE &lt;50ms</p>
+            </div>
+          </div>
+          <div class="scc-controls-group">
+            <div class="speed-selector-pills">
+              <span class="pill-label">Tốc độ:</span>
+              <button class="btn-speed active" id="btn-speed-1x" onclick="setSimulationSpeed(1.0, false)">1x</button>
+              <button class="btn-speed" id="btn-speed-10x" onclick="setSimulationSpeed(10.0, false)">10x</button>
+              <button class="btn-speed" id="btn-speed-60x" onclick="setSimulationSpeed(60.0, false)">60x</button>
+              <button class="btn-speed btn-burst" id="btn-speed-burst" onclick="setSimulationSpeed(50.0, true)">⚡ Flash Sale (Burst)</button>
+            </div>
+            <button id="btn-stream-toggle" class="btn-tool-outline" onclick="toggleStreamWorker()">⏸ Tạm dừng</button>
+          </div>
+        </div>
+
+        <!-- Live Ticker Feed of Ingested Transactions -->
+        <div class="scc-live-ticker-wrap">
+          <div class="ticker-label-tag">LIVE FEED</div>
+          <div class="scc-ticker-stream" id="scc-ticker-stream">
+            <div class="ticker-event-item" id="ticker-latest-item">Đang kết nối Server-Sent Events...</div>
+          </div>
+        </div>
+
+        <!-- 2 Action Bars: Dynamic Chaos Injection vs Closed-Loop Self-Healing Interventions -->
+        <div class="scc-action-dual-bar">
+          <div class="action-sub-bar chaos-bar">
+            <span class="bar-title text-rose"><span class="icon">⚠️</span> Bơm Sự Cố Động (Chaos Testing):</span>
+            <button class="btn-action-pill btn-chaos" onclick="triggerDynamicChaos('PAYMENT_GATEWAY_OUTAGE')">Sập Cổng MoMo (504)</button>
+            <button class="btn-action-pill btn-chaos" onclick="triggerDynamicChaos('CARRIER_LOGISTICS_DISRUPTION')">Đình Công Hãng GHN</button>
+            <button class="btn-action-pill btn-chaos" onclick="triggerDynamicChaos('FLASH_SALE_BURST')">Cơn Bão Đơn Hàng</button>
+          </div>
+          <div class="action-sub-bar healing-bar">
+            <span class="bar-title text-emerald"><span class="icon">🛡️</span> Can Thiệp Tự Trị (Self-Healing Twin):</span>
+            <button class="btn-action-pill btn-heal" onclick="triggerTwinIntervention('SWITCH_PAYMENT_GATEWAY')">Chuyển Cổng VNPay/COD</button>
+            <button class="btn-action-pill btn-heal" onclick="triggerTwinIntervention('REROUTE_CARRIER')">Đổi Hãng ViettelPost</button>
+            <button class="btn-action-pill btn-reset" onclick="triggerTwinIntervention('RESET_ALL_CHAOS')">Khôi Phục Vận Hành</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Headline KPI Grid (6 Cards) -->
+      <div class="kpi-grid">
+        <div class="kpi-card" id="kpi-revenue">
+          <div class="kpi-header">
+            <span class="kpi-label">Doanh thu Thuần Ghi nhận</span>
+            <span class="kpi-icon text-emerald">💵</span>
+          </div>
+          <div class="kpi-value" id="val-net-revenue">-- VND</div>
+          <div class="kpi-footer">
+            <span class="tag-success">Bán lẻ Đa kênh</span>
+            <span class="kpi-subtext" id="val-total-orders">-- đơn hàng</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-profit">
+          <div class="kpi-header">
+            <span class="kpi-label">Lợi nhuận Gộp (Gross Profit)</span>
+            <span class="kpi-icon text-indigo">📈</span>
+          </div>
+          <div class="kpi-value" id="val-gross-profit">-- VND</div>
+          <div class="kpi-footer">
+            <span class="tag-accent" id="val-gross-margin">Biên LN: --%</span>
+            <span class="kpi-subtext">Sau trừ giá vốn COGS</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-net-profit">
+          <div class="kpi-header">
+            <span class="kpi-label">Lợi nhuận Ròng (Net Profit)</span>
+            <span class="kpi-icon text-cyan">💎</span>
+          </div>
+          <div class="kpi-value text-cyan" id="val-net-profit">-- VND</div>
+          <div class="kpi-footer">
+            <span class="tag-cyan" id="val-net-margin">Biên Ròng: --%</span>
+            <span class="kpi-subtext">Đã khấu trừ tổn thất</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-delivery">
+          <div class="kpi-header">
+            <span class="kpi-label">Giao hàng Đúng hạn (Logistics SLA)</span>
+            <span class="kpi-icon text-amber">🚚</span>
+          </div>
+          <div class="kpi-value" id="val-ontime-rate">--%</div>
+          <div class="kpi-footer">
+            <span class="tag-warning" id="val-delayed-count">-- đơn trễ</span>
+            <span class="kpi-subtext">5 đơn vị vận chuyển</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpi-payment">
+          <div class="kpi-header">
+            <span class="kpi-label">Tỷ lệ Thành công Cổng TT</span>
+            <span class="kpi-icon text-emerald">💳</span>
+          </div>
+          <div class="kpi-value text-emerald" id="val-payment-rate">--%</div>
+          <div class="kpi-footer">
+            <span class="tag-success">Thanh toán Capture</span>
+            <span class="kpi-subtext" id="val-payment-failed">-- lỗi</span>
+          </div>
+        </div>
+
+        <div class="kpi-card border-danger-glow" id="kpi-incident-erosion">
+          <div class="kpi-header">
+            <span class="kpi-label">Tổn thất Sự cố (S001–S005)</span>
+            <span class="kpi-icon text-rose">⚠️</span>
+          </div>
+          <div class="kpi-value text-rose" id="val-incident-loss">- 2.839.689.156 ₫</div>
+          <div class="kpi-footer">
+            <span class="tag-danger">5 sự cố nghiêm trọng</span>
+            <span class="kpi-sublink" onclick="switchTab('crisis-sim')">Xem mô phỏng &rarr;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive Health Pillars Breakdown Bar -->
+      <div class="health-breakdown-card glass-panel mb-4">
+        <div class="hb-header">
+          <div>
+            <h3 class="card-title">Chỉ số Sức khỏe Vận hành Toàn Doanh nghiệp (Enterprise Health Radar)</h3>
+            <p class="card-desc">Đánh giá trọng số tổng hợp từ 5 trụ cột: Tài chính, Chuỗi cung ứng, Logistics, Khách hàng & Công nghệ số</p>
+          </div>
+          <div class="hb-grade-badge">
+            <span class="grade-label">Hạng Tín nhiệm:</span>
+            <strong class="grade-value" id="val-health-grade">B+ (61.6/100)</strong>
+          </div>
+        </div>
+        <div class="pillars-meters-grid" id="pillars-meters-container">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Visual Charts Row -->
+      <div class="charts-row">
+        <!-- Revenue & Orders Trend -->
+        <div class="chart-card flex-2">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Xu hướng Doanh thu & Giá trị Đơn hủy theo Thời gian</h3>
+              <p class="card-desc">Đối chiếu doanh thu thực nhận và đơn hàng bị hủy do sự cố chuỗi cung ứng</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-dot bg-indigo"></span> Doanh thu thực nhận
+              <span class="legend-dot bg-rose"></span> Giá trị đơn hủy
+            </div>
+          </div>
+          <div class="chart-body">
+            <canvas id="chart-revenue-trends"></canvas>
+          </div>
+        </div>
+
+        <!-- Omnichannel Sales Donut -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <h3 class="card-title">Hiệu quả Bán hàng Đa kênh</h3>
+            <p class="card-desc">Tỷ trọng doanh thu theo touchpoint</p>
+          </div>
+          <div class="chart-body">
+            <canvas id="chart-channel-sales"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lower Operational Row -->
+      <div class="charts-row">
+        <!-- Carrier SLA Logistics Table -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Chất lượng Đối tác Logistics & SLA Vận chuyển</h3>
+              <p class="card-desc">Tỷ lệ đúng hạn, số kiện trễ và thời gian giao trung bình</p>
+            </div>
+            <span class="tag-accent">5 Nhà xe</span>
+          </div>
+          <div class="chart-body">
+            <div class="carrier-table-wrapper" id="carrier-table-container"></div>
+          </div>
+        </div>
+
+        <!-- Quick Incidents & Symptoms -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Giám sát Sự cố Khủng hoảng Vận hành</h3>
+              <p class="card-desc">Hệ thống phát hiện sớm bất thường và chuỗi nhân quả</p>
+            </div>
+            <button class="subtab-btn" onclick="switchTab('crisis-sim')">Chi tiết Causal &rarr;</button>
+          </div>
+          <div class="chart-body" id="incident-quick-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 2: SUPPLY CHAIN & INVENTORY TWIN (NEW)
+         ----------------------------------------------------------------------- -->
+    <section id="view-supply-chain" class="view-panel">
+      <div class="section-intro-bar">
+        <div>
+          <h2 class="section-heading">Kho vận, Quản trị Tồn kho & Đơn vị Cung ứng</h2>
+          <p class="section-desc">Mô hình số hóa 5 trung tâm kho khu vực, rủi ro cạn hàng (Stockout) và hiệu năng nhà cung cấp</p>
+        </div>
+        <div class="stats-pill-group">
+          <div class="stat-pill"><span class="pill-k">Tổng kho:</span> <strong id="sc-total-wh">5</strong></div>
+          <div class="stat-pill"><span class="pill-k">SKU theo dõi:</span> <strong id="sc-total-skus">100</strong></div>
+          <div class="stat-pill text-rose"><span class="pill-k">Cảnh báo tồn kho:</span> <strong id="sc-alert-skus">11</strong></div>
+        </div>
+      </div>
+
+      <!-- Supply Chain KPI Grid -->
+      <div class="kpi-grid mb-4">
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Tổng Hàng Lưu kho (Units)</span>
+            <span class="kpi-icon text-indigo">📦</span>
+          </div>
+          <div class="kpi-value" id="sc-units-in-stock">-- sp</div>
+          <div class="kpi-footer">
+            <span class="tag-accent">Tồn kho khả dụng</span>
+            <span class="kpi-subtext">5 kho khu vực</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Giá trị Vốn Tồn kho (COGS Val.)</span>
+            <span class="kpi-icon text-emerald">💰</span>
+          </div>
+          <div class="kpi-value" id="sc-inventory-val">-- VND</div>
+          <div class="kpi-footer">
+            <span class="tag-success">Vốn lưu động</span>
+            <span class="kpi-subtext">Định giá theo giá vốn</span>
+          </div>
+        </div>
+
+        <div class="kpi-card border-warning-glow">
+          <div class="kpi-header">
+            <span class="kpi-label">SKUs Dưới Ngưỡng An toàn</span>
+            <span class="kpi-icon text-amber">⚠️</span>
+          </div>
+          <div class="kpi-value text-amber" id="sc-low-stock-count">-- SKUs</div>
+          <div class="kpi-footer">
+            <span class="tag-warning">Cần nhập bổ sung</span>
+            <span class="kpi-subtext">Bao gồm mã Eco Laptop</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Nhà cung cấp Quan trọng</span>
+            <span class="kpi-icon text-cyan">🤝</span>
+          </div>
+          <div class="kpi-value text-cyan">20 Đối tác</div>
+          <div class="kpi-footer">
+            <span class="tag-danger">Viet Electronics (S001)</span>
+            <span class="kpi-subtext">62 đơn mua hàng (PO)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warehouses Capacity Row -->
+      <div class="charts-row">
+        <div class="chart-card flex-2">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Năng lực Sức chứa & Tỷ lệ Lấp đầy 5 Trung tâm Kho</h3>
+              <p class="card-desc">Đối chiếu khối lượng lưu trữ thực tế so với thiết kế định mức</p>
+            </div>
+            <span class="tag-accent">Thời gian thực</span>
+          </div>
+          <div class="chart-body" id="warehouses-bars-container">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <h3 class="card-title">Cơ cấu Trữ lượng theo Khu vực</h3>
+            <p class="card-desc">Phân bổ tồn kho Bắc - Trung - Nam</p>
+          </div>
+          <div class="chart-body">
+            <canvas id="chart-warehouse-region"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Critical Low Stock Alerts Table -->
+      <div class="glass-panel mb-4">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title text-rose">Danh sách Sản phẩm Cảnh báo Cạn kho (Reorder Point Breach)</h3>
+            <p class="card-desc">Các sản phẩm có số lượng tồn khả dụng thấp hơn hoặc chạm điểm đặt hàng lại</p>
+          </div>
+          <span class="tag-danger" id="low-stock-badge-tag">11 SKUs Nguy cơ</span>
+        </div>
+        <div class="table-responsive">
+          <table class="statement-table" id="low-stock-table">
+            <thead>
+              <tr>
+                <th>Tên sản phẩm</th>
+                <th>Danh mục</th>
+                <th>Kho vị trí</th>
+                <th style="text-align:right;">Tồn khả dụng</th>
+                <th style="text-align:right;">Ngưỡng an toàn</th>
+                <th style="text-align:right;">Đơn giá bán</th>
+                <th style="text-align:center;">Trạng thái rủi ro</th>
+              </tr>
+            </thead>
+            <tbody id="low-stock-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Suppliers Performance & PO Pipeline -->
+      <div class="glass-panel">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Đánh giá Đối tác Cung ứng & Tiến độ Đơn mua hàng (PO Pipeline)</h3>
+            <p class="card-desc">Xếp hạng độ tin cậy giao hàng, thời gian Lead Time và rủi ro đứt gãy cung ứng</p>
+          </div>
+          <span class="tag-accent">Nhà cung cấp Chiến lược</span>
+        </div>
+        <div class="table-responsive">
+          <table class="statement-table" id="suppliers-table">
+            <thead>
+              <tr>
+                <th>Nhà cung cấp</th>
+                <th>Khu vực</th>
+                <th style="text-align:right;">Độ tin cậy</th>
+                <th style="text-align:right;">Lead Time TB</th>
+                <th style="text-align:right;">Tổng đơn PO</th>
+                <th style="text-align:right;">Giá trị PO (VND)</th>
+                <th style="text-align:center;">Trạng thái sự cố</th>
+              </tr>
+            </thead>
+            <tbody id="suppliers-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 3: CUSTOMER INTELLIGENCE & MARKETING (NEW)
+         ----------------------------------------------------------------------- -->
+    <section id="view-customer-growth" class="view-panel">
+      <div class="section-intro-bar">
+        <div>
+          <h2 class="section-heading">Thông tin Khách hàng, Trải nghiệm & Hiệu quả Tiếp thị</h2>
+          <p class="section-desc">Phân khúc khách hàng, phân tích mức độ hài lòng CSAT, đánh giá chất lượng và ROI chiến dịch</p>
+        </div>
+        <div class="stats-pill-group">
+          <div class="stat-pill"><span class="pill-k">CSAT TB:</span> <strong>3.28 / 5.0 ⭐</strong></div>
+          <div class="stat-pill text-amber"><span class="pill-k">Khách hàng Rủi ro:</span> <strong>22% (At-Risk & Churn)</strong></div>
+          <div class="stat-pill text-rose"><span class="pill-k">Bất thường Marketing:</span> <strong>TikTok Ads S004</strong></div>
+        </div>
+      </div>
+
+      <!-- Customer KPI Grid -->
+      <div class="kpi-grid mb-4">
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Tổng Hồ sơ Khách hàng</span>
+            <span class="kpi-icon text-indigo">👤</span>
+          </div>
+          <div class="kpi-value">100 Profile</div>
+          <div class="kpi-footer">
+            <span class="tag-accent">5 phân khúc CRM</span>
+            <span class="kpi-subtext">Hệ thống khách hàng thân thiết</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Điểm Hài lòng CSAT Trung bình</span>
+            <span class="kpi-icon text-amber">⭐</span>
+          </div>
+          <div class="kpi-value text-amber">3.28 / 5.0</div>
+          <div class="kpi-footer">
+            <span class="tag-warning">Sụt giảm do S002 & S005</span>
+            <span class="kpi-subtext">127 phiếu hỗ trợ</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">Tổng Đánh giá & Review</span>
+            <span class="kpi-icon text-cyan">💬</span>
+          </div>
+          <div class="kpi-value text-cyan">416 Đánh giá</div>
+          <div class="kpi-footer">
+            <span class="tag-danger">40 đánh giá 1 sao</span>
+            <span class="kpi-subtext">Chủ yếu phản hồi pin máy S005</span>
+          </div>
+        </div>
+
+        <div class="kpi-card border-danger-glow">
+          <div class="kpi-header">
+            <span class="kpi-label">Tổng Ngân sách Tiếp thị</span>
+            <span class="kpi-icon text-rose">🎯</span>
+          </div>
+          <div class="kpi-value text-rose">485.000.000 ₫</div>
+          <div class="kpi-footer">
+            <span class="tag-danger">Lãng phí TikTok Ads</span>
+            <span class="kpi-subtext">CAC vọt lên 17.3M/khách</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Charts Row -->
+      <div class="charts-row">
+        <!-- Customer Segments Donut -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <h3 class="card-title">Cơ cấu Phân khúc Khách hàng (CRM)</h3>
+            <p class="card-desc">Tỷ trọng số lượng & giá trị doanh thu</p>
+          </div>
+          <div class="chart-body">
+            <canvas id="chart-customer-segments"></canvas>
+          </div>
+        </div>
+
+        <!-- Sentiment & Ratings Distribution -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <h3 class="card-title">Phân bổ Đánh giá Khách hàng (1⭐ - 5⭐)</h3>
+            <p class="card-desc">Tác động từ sự cố Eco Laptop và giao trễ</p>
+          </div>
+          <div class="chart-body">
+            <canvas id="chart-ratings-dist"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Support Tickets Breakdown & Marketing Campaigns Table -->
+      <div class="charts-row">
+        <!-- Customer Tickets Table -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Phân tích Phiếu Khiếu nại Hỗ trợ (Tickets)</h3>
+              <p class="card-desc">Phân loại theo lý do, thời gian giải quyết và điểm CSAT</p>
+            </div>
+            <span class="tag-accent">127 Tickets</span>
+          </div>
+          <div class="chart-body">
+            <div class="table-responsive">
+              <table class="table-simple" id="tickets-table">
+                <thead>
+                  <tr>
+                    <th>Chủ đề Khiếu nại</th>
+                    <th style="text-align:right;">Số ticket</th>
+                    <th style="text-align:right;">Tỷ trọng</th>
+                    <th style="text-align:right;">Thời gian giải quyết</th>
+                    <th style="text-align:right;">CSAT</th>
+                  </tr>
+                </thead>
+                <tbody id="tickets-table-body">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Marketing Campaigns Performance Table -->
+        <div class="chart-card flex-1">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Hiệu quả Chiến dịch Tiếp thị & Chi phí Thu nạp (CAC)</h3>
+              <p class="card-desc">Đo lường Impressions, Clicks, Conversions và ROI</p>
+            </div>
+            <span class="tag-accent">5 Chiến dịch</span>
+          </div>
+          <div class="chart-body">
+            <div class="table-responsive">
+              <table class="table-simple" id="marketing-table">
+                <thead>
+                  <tr>
+                    <th>Kênh / Chiến dịch</th>
+                    <th style="text-align:right;">Ngân sách chi</th>
+                    <th style="text-align:right;">Lượt click</th>
+                    <th style="text-align:right;">Đơn (CVR)</th>
+                    <th style="text-align:right;">CAC (VND)</th>
+                    <th style="text-align:center;">Hiệu suất</th>
+                  </tr>
+                </thead>
+                <tbody id="marketing-table-body">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 4: FINANCIAL CENTER & P&L
+         ----------------------------------------------------------------------- -->
+    <section id="view-finance" class="view-panel">
+      <div class="finance-header-bar">
+        <div>
+          <h2 class="section-heading">Báo cáo Tài chính & Phân tích Hiệu quả Kinh doanh</h2>
+          <p class="section-desc">Số liệu tổng hợp từ giao dịch nghiệp vụ thực tế, giá vốn và tổn thất các sự cố</p>
+        </div>
+        <div class="finance-subtabs">
+          <button class="subtab-btn active" onclick="switchFinSubtab('waterfall')">Biểu đồ Thác nước (Waterfall)</button>
+          <button class="subtab-btn" onclick="switchFinSubtab('pnl')">Báo cáo P&L Chi tiết</button>
+          <button class="subtab-btn" onclick="switchFinSubtab('cashflow')">Lưu chuyển Tiền tệ</button>
+          <button class="subtab-btn" onclick="switchFinSubtab('categories')">Biên LN Ngành hàng</button>
+        </div>
+      </div>
+
+      <!-- SUBTAB 0: Waterfall Visual Chart (NEW) -->
+      <div id="subview-waterfall" class="fin-subview active">
+        <div class="chart-card mb-4">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Dòng thác Giá trị Lợi nhuận (P&L Value Flow Waterfall)</h3>
+              <p class="card-desc">Minh họa sự xói mòn từ Doanh thu Gộp ➔ Lợi nhuận Ròng sau các tổn thất sự cố S001–S005</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-dot bg-emerald"></span> Dòng tiền vào
+              <span class="legend-dot bg-rose"></span> Chi phí & Tổn thất
+              <span class="legend-dot bg-cyan"></span> Lợi nhuận thực nhận
+            </div>
+          </div>
+          <div class="chart-body" style="height: 380px;">
+            <canvas id="chart-pnl-waterfall"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 1: P&L Statement -->
+      <div id="subview-pnl" class="fin-subview">
+        <div class="pnl-container glass-panel">
+          <div class="pnl-header">
+            <h3>BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (INCOME STATEMENT)</h3>
+            <span class="currency-tag">Đơn vị: Việt Nam Đồng (VND)</span>
+          </div>
+
+          <table class="statement-table" id="pnl-statement-table">
+            <thead>
+              <tr>
+                <th style="width: 45%;">Khoản mục Tài chính</th>
+                <th style="width: 25%; text-align: right;">Giá trị (VND)</th>
+                <th style="width: 15%; text-align: right;">Tỷ trọng / Doanh thu</th>
+                <th style="width: 15%; text-align: center;">Ghi chú Nghiệp vụ</th>
+              </tr>
+            </thead>
+            <tbody id="pnl-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Incident Financial Erosion Breakdown -->
+        <div class="incident-loss-box glass-panel">
+          <div class="box-header">
+            <h4 class="text-rose">BÓNG MA SỰ CỐ: THẤT THOÁT TÀI CHÍNH TỪ 5 KỊCH BẢN KHỦNG HOẢNG</h4>
+            <span class="badge-total-loss" id="badge-total-loss-val">Tổng: -- VND</span>
+          </div>
+          <div class="loss-cards-grid" id="loss-cards-grid">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2: Cash Flow Statement -->
+      <div id="subview-cashflow" class="fin-subview">
+        <div class="cashflow-grid">
+          <div class="glass-panel flex-1">
+            <h4 class="cf-title text-emerald">1. DÒNG TIỀN THU (INFLOWS)</h4>
+            <div id="cf-inflows-content"></div>
+          </div>
+          <div class="glass-panel flex-1">
+            <h4 class="cf-title text-rose">2. DÒNG TIỀN CHI (OUTFLOWS)</h4>
+            <div id="cf-outflows-content"></div>
+          </div>
+          <div class="glass-panel flex-1 highlight-card">
+            <h4 class="cf-title text-indigo">3. LƯU CHUYỂN TIỀN THUẦN (NET CASH)</h4>
+            <div class="cf-net-value" id="cf-net-amount">-- VND</div>
+            <p class="cf-desc">Chênh lệch dòng tiền thực tế sau khi thanh toán hàng tồn kho, tiếp thị, cước vận chuyển và bồi hoàn khách hàng.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 3: Category Margins -->
+      <div id="subview-categories" class="fin-subview">
+        <div class="glass-panel">
+          <h4 class="card-title mb-3">Hiệu quả Biên Lợi nhuận gộp theo Danh mục Sản phẩm</h4>
+          <table class="statement-table" id="category-margins-table">
+            <thead>
+              <tr>
+                <th>Ngành hàng</th>
+                <th style="text-align: right;">Số lượng bán</th>
+                <th style="text-align: right;">Doanh thu (VND)</th>
+                <th style="text-align: right;">Giá vốn COGS (VND)</th>
+                <th style="text-align: right;">Lợi nhuận gộp (VND)</th>
+                <th style="text-align: right;">Biên LN Gộp (%)</th>
+              </tr>
+            </thead>
+            <tbody id="category-margins-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 5: CRISIS COMMAND, CAUSAL DAG & "WHAT-IF" SIMULATION
+         ----------------------------------------------------------------------- -->
+    <section id="view-crisis-sim" class="view-panel">
+      <div class="incidents-intro">
+        <div>
+          <h2 class="section-heading">Mô phỏng Khủng hoảng Số, Chuỗi Nhân quả & Bộ Can thiệp Điều hành</h2>
+          <p class="section-desc">Phân tích chuỗi tác động Causal DAG và chạy giả lập thử nghiệm các quyết định cứu vãn lợi nhuận thời gian thực</p>
+        </div>
+        <div class="benchmark-cert-badge">
+          <span class="cert-check">✔</span>
+          <span>100% EXCELLENT BENCHMARK CERTIFIED (Score: 100.0/100)</span>
+        </div>
+      </div>
+
+      <!-- SECTION A: "WHAT-IF" INTERACTIVE SIMULATION SANDBOX -->
+      <div class="sim-sandbox-card glass-panel mb-4">
+        <div class="sim-header">
+          <div class="sim-title-group">
+            <span class="sim-icon">🚀</span>
+            <div>
+              <h3 class="card-title text-cyan">Bộ Giả lập Quyết định Can thiệp Số ("What-If" Simulation Sandbox)</h3>
+              <p class="card-desc">Thử nghiệm các chiến lược can thiệp điều hành và tính toán ngay mức độ thu hồi tài chính và phục hồi SLA</p>
+            </div>
+          </div>
+          <button class="btn-run-sim" onclick="runWhatIfSimulation()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Chạy Mô phỏng Can thiệp
+          </button>
+        </div>
+
+        <div class="sim-controls-grid">
+          <!-- Intervention 1: Backup Supplier -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge">S001</span>
+              <label class="sim-label">Nhà cung ứng dự phòng Đài Loan</label>
+            </div>
+            <p class="sim-hint">Kích hoạt nguồn cung bo mạch chủ thay thế Viet Electronics</p>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sim-supplier-toggle" checked onchange="runWhatIfSimulation()">
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Kích hoạt nguồn cung</span>
+            </label>
+          </div>
+
+          <!-- Intervention 2: GHN Rerouting Slider -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge">S002</span>
+              <label class="sim-label">Điều chuyển logistics GHN: <strong id="val-reroute-display" class="text-amber">35%</strong></label>
+            </div>
+            <p class="sim-hint">Chuyển sản lượng qua Viettel Post / VNPost</p>
+            <input type="range" id="sim-reroute-slider" min="0" max="100" value="35" step="5" class="range-slider" oninput="updateSliderLabel('val-reroute-display', this.value + '%'); runWhatIfSimulation()">
+          </div>
+
+          <!-- Intervention 3: MoMo Smart Failover -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge">S003</span>
+              <label class="sim-label">Smart Failover Cổng MoMo</label>
+            </div>
+            <p class="sim-hint">Tự động chuyển tiếp sang VNPay/ZaloPay khi lỗi > 5%</p>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sim-momo-toggle" checked onchange="runWhatIfSimulation()">
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Bật chế độ Failover</span>
+            </label>
+          </div>
+
+          <!-- Intervention 4: TikTok Budget Reallocation Slider -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge">S004</span>
+              <label class="sim-label">Tái phân bổ ngân sách TikTok: <strong id="val-tiktok-display" class="text-indigo">50%</strong></label>
+            </div>
+            <p class="sim-hint">Chuyển sang Google Search & Retargeting</p>
+            <input type="range" id="sim-tiktok-slider" min="0" max="100" value="50" step="5" class="range-slider" oninput="updateSliderLabel('val-tiktok-display', this.value + '%'); runWhatIfSimulation()">
+          </div>
+
+          <!-- Intervention 5: Eco Laptop OTA Patch -->
+          <div class="sim-control-box">
+            <div class="sim-ctrl-head">
+              <span class="sim-badge">S005</span>
+              <label class="sim-label">Bản vá OTA Firmware Eco Laptop</label>
+            </div>
+            <p class="sim-hint">Vá lỗi quản lý nguồn pin & gửi voucher chăm sóc</p>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sim-ota-toggle" checked onchange="runWhatIfSimulation()">
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Phát hành bản vá OTA</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Simulation Projected Outcomes Result Box -->
+        <div class="sim-results-panel" id="sim-results-panel">
+          <div class="sim-res-header">
+            <h4>KẾT QUẢ DỰ BÁO CAN THIỆP SỐ (PROJECTED DIGITAL RECOVERY)</h4>
+            <span class="res-status-tag">Thời gian thực</span>
+          </div>
+          <div class="sim-kpi-result-row">
+            <div class="sim-res-kpi">
+              <span class="kpi-micro-label">TỔN THẤT THU HỒI ĐƯỢC</span>
+              <strong class="text-emerald" id="sim-res-recovered">+ 1.886.000.000 ₫</strong>
+              <span class="kpi-micro-sub">Cứu vãn 66.4% thiệt hại</span>
+            </div>
+            <div class="sim-res-kpi">
+              <span class="kpi-micro-label">LỢI NHUẬN RÒNG DỰ BÁO</span>
+              <strong class="text-cyan" id="sim-res-net-profit">4.618.958.444 ₫</strong>
+              <span class="kpi-micro-sub" id="sim-res-margin">Biên ròng tăng lên 19.7%</span>
+            </div>
+            <div class="sim-res-kpi">
+              <span class="kpi-micro-label">SLA GIAO HÀNG PHỤC HỒI</span>
+              <strong class="text-amber" id="sim-res-sla">94.5%</strong>
+              <span class="kpi-micro-sub">Tăng +12.2% so với đáy</span>
+            </div>
+            <div class="sim-res-kpi">
+              <span class="kpi-micro-label">HEALTH INDEX DỰ KIẾN</span>
+              <strong class="text-emerald" id="sim-res-health">+ 12.0 Điểm</strong>
+              <span class="kpi-micro-sub">Đạt ngưỡng Xanh ổn định</span>
+            </div>
+          </div>
+          <div class="sim-breakdown-list" id="sim-breakdown-list">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION B: INTERACTIVE CAUSAL DAG VIEWER -->
+      <div class="dag-viewer-card glass-panel mb-4">
+        <div class="dag-header">
+          <div>
+            <h3 class="card-title text-indigo">Sơ đồ Chuỗi Nhân quả Tác động Chéo (Cross-Domain Causal DAG)</h3>
+            <p class="card-desc">Lần vết từ nguyên nhân gốc rễ (Root Cause) qua triệu chứng lan truyền đến tổn thất tài chính</p>
+          </div>
+          <div class="dag-scenario-selector" id="dag-selector-group">
+            <button class="dag-sc-btn active" onclick="loadCausalDag('S001')">S001 Supply</button>
+            <button class="dag-sc-btn" onclick="loadCausalDag('S002')">S002 Logistics</button>
+            <button class="dag-sc-btn" onclick="loadCausalDag('S003')">S003 Payment</button>
+            <button class="dag-sc-btn" onclick="loadCausalDag('S004')">S004 Marketing</button>
+            <button class="dag-sc-btn" onclick="loadCausalDag('S005')">S005 Quality</button>
+          </div>
+        </div>
+
+        <div class="dag-flow-container" id="dag-flow-viewport">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- SECTION C: MULTI-AGENT DEBATE ARENA & ACCOUNTABILITY -->
+      <div class="debate-arena-card glass-panel mb-4" id="debate-arena-section">
+        <div class="debate-header">
+          <div class="debate-title-group">
+            <span class="debate-icon">⚔️</span>
+            <div>
+              <h3 class="card-title text-purple">Đấu trường Đa tác nhân Phản biện & Bảng Trách nhiệm Giải trình</h3>
+              <p class="card-desc">Cơ chế đối thoại đa vòng (Multi-Agent Debate) giữa 3 Specialist và 2 Critic. Công khai minh bạch: Agent nào sai và Critic nào bắt được lỗi.</p>
+            </div>
+          </div>
+          <div class="debate-scenario-selector" id="debate-selector-group">
+            <button class="debate-sc-btn active" id="btn-deb-s001" onclick="switchDebateScenario('S001')">S001 Supply</button>
+            <button class="debate-sc-btn" id="btn-deb-s002" onclick="switchDebateScenario('S002')">S002 Logistics</button>
+            <button class="debate-sc-btn" id="btn-deb-s003" onclick="switchDebateScenario('S003')">S003 Payment</button>
+            <button class="debate-sc-btn" id="btn-deb-s004" onclick="switchDebateScenario('S004')">S004 Marketing</button>
+            <button class="debate-sc-btn" id="btn-deb-s005" onclick="switchDebateScenario('S005')">S005 Quality</button>
+          </div>
+        </div>
+
+        <!-- 6-Agent Performance Roster Grid -->
+        <div class="roster-section-head">
+          <span class="subhead-badge">AGENT ROSTER & SCORECARD</span>
+          <span class="subhead-desc">Bảng phong thần hiệu năng: Tỷ lệ chính xác, số giả thuyết đề xuất và số lỗi phản biện bắt được</span>
+        </div>
+        <div class="agent-roster-grid" id="agent-roster-container">
+          <!-- Rendered dynamically via JS -->
+        </div>
+
+        <!-- Multi-Round Debate Timeline & Transcript -->
+        <div class="debate-timeline-section">
+          <div class="timeline-section-head">
+            <span class="subhead-badge bg-indigo">DEBATE TRANSCRIPT (4 ROUNDS)</span>
+            <span class="subhead-desc">Tiến trình 4 vòng: Đề xuất giả thuyết &rarr; Thẩm định chứng cứ SQL &rarr; Kiểm tra cấu trúc nhân quả &rarr; Phán quyết tổng hợp</span>
+          </div>
+          <div class="debate-rounds-list" id="debate-rounds-container">
+            <!-- Rendered dynamically via JS -->
+          </div>
+        </div>
+
+        <!-- Ground Truth & Accountability Callout -->
+        <div class="accountability-verdict-box" id="accountability-verdict-container">
+          <!-- Rendered dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- SECTION D: DETAILED INCIDENTS REGISTRY (ACTIVE VS ARCHIVED) -->
+      <div id="crisis-registry-wrapper">
+        <!-- Zone 1: Active Real-Time Incidents -->
+        <div class="active-incidents-section mb-4">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 class="card-title text-rose" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+              <span>🚨</span> Sự cố Khẩn cấp Đang Diễn ra (Thời gian Thực)
+            </h3>
+            <span class="tag-danger" id="badge-active-crisis-live" style="display:none;">CẢNH BÁO ĐỎ</span>
+          </div>
+          <div id="active-incidents-container">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Zone 2: Historical Incident Archive -->
+        <div class="historical-archive-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="card-title text-cyan" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span>📁</span> Hồ sơ Lưu trữ Sự cố Lịch sử & Bài học Vận hành (Incident Archive - Tháng 08/2026)
+              </h3>
+              <p class="card-desc" style="margin: 0; font-size: 0.82rem;">Các cuộc khủng hoảng đã được giải quyết triệt để, đóng hồ sơ và chuyển vào kho lưu trữ phục vụ truy vết, kiểm toán và huấn luyện 6 tác nhân AI</p>
+            </div>
+            <span class="archive-badge-tag">5 Sự cố Đã Đóng &bull; 100% Khắc phục</span>
+          </div>
+          <div class="incidents-cards-list" id="historical-incidents-container">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------------
+         PANEL 6: NATURAL LANGUAGE AI ASSISTANT (COPILOT)
+         ----------------------------------------------------------------------- -->
+    <section id="view-ai-assistant" class="view-panel">
+      <div class="ai-assistant-container glass-panel">
+        <!-- Chat Header -->
+        <div class="chat-header">
+          <div class="ai-agent-avatar">
+            <span class="ai-glow-orb"></span>
+            <div class="avatar-icon">AI</div>
+          </div>
+          <div class="ai-header-meta">
+            <h3 class="ai-agent-title">Trợ lý Phân tích Dữ liệu Doanh nghiệp (Enterprise AI Analyst Copilot)</h3>
+            <p class="ai-agent-subtitle">Truy vấn bằng ngôn ngữ tự nhiên tiếng Việt &bull; Thực thi SQL an toàn trong sandbox &bull; Bảo mật 100% RBAC</p>
+          </div>
+          <div class="role-selector-bar">
+            <span class="role-label">Góc nhìn:</span>
+            <button class="role-btn active" onclick="filterSuggestions('CEO')">Tổng Giám đốc (CEO)</button>
+            <button class="role-btn" onclick="filterSuggestions('CFO')">Giám đốc Tài chính (CFO)</button>
+            <button class="role-btn" onclick="filterSuggestions('COO')">Giám đốc Vận hành (COO)</button>
+            <button class="role-btn" onclick="filterSuggestions('CMO')">Giám đốc Marketing (CMO)</button>
+          </div>
+        </div>
+
+        <!-- Live Data Streaming & Continual Learning Telemetry Bar -->
+        <div class="stream-telemetry-bar" id="stream-telemetry-bar">
+          <div class="stream-left">
+            <span class="stream-pulse-dot" id="stream-pulse-indicator"></span>
+            <span class="stream-title">DỮ LIỆU LUỒNG LIÊN TỤC (NUÔI AI):</span>
+            <span class="stream-status-tag active" id="stream-status-badge">ĐANG CHẢY (ACTIVE)</span>
+            <span class="stream-metrics" id="stream-metrics-text">⚡ 20 sự kiện/phút &bull; Tổng: 142 sự kiện &bull; Vận tốc đơn: 18.5/phút</span>
+          </div>
+          <div class="stream-right">
+            <button type="button" class="btn-stream-action" onclick="toggleStreamWorker()" id="btn-stream-toggle" title="Tạm dừng hoặc tiếp tục luồng nạp dữ liệu">
+              ⏸ Tạm dừng
+            </button>
+            <button type="button" class="btn-stream-action btn-stream-inject" onclick="injectSampleStreamEvent()" title="Bơm một sự kiện thử nghiệm tức thì vào luồng">
+              ⚡ Bơm sự kiện mẫu
+            </button>
+          </div>
+        </div>
+
+        <!-- Topic Categories Bar -->
+        <div class="topic-categories-bar" id="topic-categories" style="display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);overflow-x:auto;">
+          <span class="role-label" style="font-size:0.75rem;font-weight:700;color:var(--text-muted);white-space:nowrap;">CHỦ ĐỀ:</span>
+          <button class="topic-btn active" data-topic="All" onclick="filterTopic('All')">🌟 Tất cả</button>
+          <button class="topic-btn" data-topic="Revenue" onclick="filterTopic('Revenue')">💰 Doanh thu</button>
+          <button class="topic-btn" data-topic="Orders" onclick="filterTopic('Orders')">📦 Đơn hàng</button>
+          <button class="topic-btn" data-topic="Customers" onclick="filterTopic('Customers')">👥 Khách hàng</button>
+          <button class="topic-btn" data-topic="Products" onclick="filterTopic('Products')">🏷️ Sản phẩm</button>
+          <button class="topic-btn" data-topic="Employees" onclick="filterTopic('Employees')">👔 Nhân viên</button>
+          <button class="topic-btn" data-topic="Diagnostics" onclick="filterTopic('Diagnostics')">🧠 Chẩn đoán sự cố</button>
+        </div>
+
+        <!-- Suggestion Chips Bar -->
+        <div class="suggestion-chips-bar" id="suggestion-chips">
+          <span class="chip-label">Gợi ý phân tích:</span>
+          <!-- Dynamic Prompt Chips -->
+        </div>
+
+        <!-- Chat Stream -->
+        <div class="chat-stream" id="chat-messages">
+          <div class="chat-message assistant-msg">
+            <div class="msg-avatar">AI</div>
+            <div class="msg-content">
+              <p>Xin chào Ban Điều hành! Tôi là <strong>Trợ lý AI Doanh nghiệp số</strong>.</p>
+              <p>Tôi có thể phân tích tức thời toàn bộ dữ liệu về <strong>Doanh thu P&L, Dòng tiền, Kho vận 5 trung tâm, Hiệu năng 20 nhà cung cấp, Phân khúc khách hàng, Lãng phí quảng cáo TikTok</strong> hay <strong>Nguyên nhân gốc rễ và kịch bản can thiệp 5 sự cố (S001–S005)</strong>.</p>
+              <p>Bạn muốn tra cứu hoặc mô phỏng chỉ số nào ngay bây giờ?</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <form class="chat-input-bar" id="chat-form" onsubmit="handleSendQuery(event)">
+          <input 
+            type="text" 
+            id="ai-user-input" 
+            class="chat-text-input" 
+            placeholder="Hỏi về doanh thu, tồn kho Eco Laptop, tỷ lệ giao trễ GHN, chi phí TikTok hay P&L..." 
+            autocomplete="off"
+            required
+          >
+          <button type="submit" id="btn-send-query" class="btn-send">
+            <span>Gửi câu hỏi</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       5. Modals: RCA Report & Executive Export
+       ========================================================================= -->
+
+  <!-- RCA Report Modal -->
+  <div id="rca-modal" class="modal-overlay" onclick="closeRcaModal(event)">
+    <div class="modal-content glass-panel" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-rca-title">Báo cáo Phân tích Nguyên nhân Gốc (Root Cause Analysis - RCA)</h3>
+        <button class="btn-close-modal" onclick="closeRcaModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-rca-content"></div>
+    </div>
+  </div>
+
+  <!-- Executive Print & Export Modal -->
+  <div id="export-modal" class="modal-overlay" onclick="closeExportModal(event)">
+    <div class="modal-content glass-panel modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>BÁO CÁO ĐIỀU HÀNH DOANH NGHIỆP — EXECUTIVE C-SUITE BRIEFING</h3>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Tập đoàn OmniCorp &bull; Kỳ quan sát Tháng 08/2026 &bull; Chuẩn xuất bản HĐQT</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn-send" onclick="window.print()" style="padding:6px 16px;font-size:0.85rem;">
+            In / Lưu PDF
+          </button>
+          <button class="btn-close-modal" onclick="closeExportModal()">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="export-preview-content">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 24/7 Autonomous Sentinel Audit Logs Modal -->
+  <div id="sentinel-modal" class="modal-overlay" onclick="closeSentinelModal(event)">
+    <div class="modal-content glass-panel modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-sentinel-title">🛡️ 24/7 AUTONOMOUS SENTINEL — NHẬT KÝ NHỊP TIM DOANH NGHIỆP</h3>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Hệ thống giám sát liên tục & Tự động kích hoạt 6 Agent điều tra RCA</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn-tool-outline" onclick="triggerSentinelScanNow()" style="padding:6px 14px;font-size:0.85rem;background:rgba(99,102,241,0.2);border-color:#6366f1;">
+            ⚡ Quét ngay
+          </button>
+          <button class="btn-close-modal" onclick="closeSentinelModal()">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="modal-sentinel-content">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Application JS Logic -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
