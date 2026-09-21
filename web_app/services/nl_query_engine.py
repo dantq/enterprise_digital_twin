@@ -418,13 +418,136 @@ class NLQueryEngine:
             try:
                 llm_result = self._process_with_llm(clean_q, provider, api_key, config)
                 if llm_result:
-                    return llm_result
+                    return self._enrich_with_dynamic_artifact(llm_result, clean_q, q_lower)
             except Exception as e:
                 # Log error and gracefully fall back to local semantic engine
                 pass
 
         # 3. Fallback to Enhanced Universal Semantic Engine (Local / Offline)
-        return self._process_with_semantic_engine(clean_q, q_lower)
+        res = self._process_with_semantic_engine(clean_q, q_lower)
+        return self._enrich_with_dynamic_artifact(res, clean_q, q_lower)
+
+    def _enrich_with_dynamic_artifact(self, result: Dict[str, Any], clean_q: str, q_lower: str) -> Dict[str, Any]:
+        """Dynamically constructs rich interactive Chart and Executive Report artifacts from query data."""
+        if not result or result.get("status") != "SUCCESS":
+            return result
+
+        data = result.get("data", [])
+        is_chart_requested = any(kw in q_lower for kw in [
+            "biểu đồ", "vẽ", "sinh biểu đồ", "đồ thị", "chart", "so sánh", "tỷ lệ", "phân bổ", "cơ cấu", "xu hướng"
+        ])
+        is_report_requested = any(kw in q_lower for kw in [
+            "báo cáo", "report", "p&l", "kết quả kinh doanh", "tổng kết", "tổng hợp", "đánh giá", "điều tra", "rca"
+        ])
+
+        # Executive colors for Chart.js
+        colors = [
+            "rgba(6, 182, 212, 0.85)",   # Electric Cyan
+            "rgba(16, 185, 129, 0.85)",  # Emerald
+            "rgba(139, 92, 246, 0.85)",  # Violet
+            "rgba(245, 158, 11, 0.85)",  # Amber
+            "rgba(244, 63, 94, 0.85)",   # Rose
+            "rgba(59, 130, 246, 0.85)",  # Blue
+            "rgba(168, 85, 247, 0.85)",  # Purple
+        ]
+        border_colors = [
+            "#06b6d4", "#10b981", "#8b5cf6", "#f59e0b", "#f43f5e", "#3b82f6", "#a855f7"
+        ]
+
+        chart_artifact = None
+        report_artifact = None
+
+        if data and isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+            first_row = data[0]
+            keys = list(first_row.keys())
+
+            def _clean_num(val):
+                if isinstance(val, (int, float)):
+                    return float(val)
+                if not isinstance(val, str):
+                    return None
+                cleaned = re.sub(r"[^\d\.\-]", "", val)
+                try:
+                    return float(cleaned)
+                except Exception:
+                    return None
+
+            if len(keys) >= 2:
+                label_key = keys[0]
+                metric_keys = [k for k in keys[1:] if any(_clean_num(row.get(k)) is not None for row in data)]
+                if not metric_keys:
+                    metric_keys = [keys[1]]
+
+                primary_metric = metric_keys[0]
+                labels = [str(row.get(label_key, "")) for row in data]
+                values = [(_clean_num(row.get(primary_metric)) or 0.0) for row in data]
+
+                # Select chart kind
+                if any(kw in q_lower for kw in ["phân bổ", "tỷ trọng", "cơ cấu", "pie", "doughnut", "tròn"]):
+                    chart_kind = "doughnut"
+                elif any(kw in q_lower for kw in ["xu hướng", "diễn biến", "theo ngày", "theo tháng", "line", "dòng"]):
+                    chart_kind = "line"
+                else:
+                    chart_kind = "bar"
+
+                chart_artifact = {
+                    "type": "chart",
+                    "chart_type": chart_kind,
+                    "title": f"Biểu đồ: {primary_metric} theo {label_key}",
+                    "subtitle": f"Tự động sinh từ dữ liệu thời gian thực ({len(data)} bản ghi)",
+                    "label_key": label_key,
+                    "metric_key": primary_metric,
+                    "labels": labels,
+                    "datasets": [{
+                        "label": primary_metric,
+                        "data": values,
+                        "backgroundColor": colors[:len(values)] if chart_kind in ["doughnut", "pie"] else "rgba(6, 182, 212, 0.7)",
+                        "borderColor": border_colors[:len(values)] if chart_kind in ["doughnut", "pie"] else "#06b6d4",
+                        "borderWidth": 1.5,
+                        "borderRadius": 6 if chart_kind == "bar" else 0,
+                    }],
+                }
+
+            # Build Report Artifact
+            kpis = []
+            for row in data[:4]:
+                kpis.append({
+                    "label": str(row.get(keys[0], "")),
+                    "value": str(row.get(keys[1] if len(keys) > 1 else keys[0], "")),
+                })
+
+            report_artifact = {
+                "type": "report",
+                "title": f"Báo cáo Điều hành: {clean_q.strip().capitalize()}",
+                "domain": result.get("domain", "Executive Intelligence"),
+                "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "summary": result.get("answer", ""),
+                "kpis": kpis,
+                "table_headers": keys,
+                "table_rows": [[str(row.get(k, "")) for k in keys] for row in data],
+                "recommendations": [
+                    "Duy trì giám sát sát sao các biến động trên 10% trong vòng 24h tới.",
+                    "Kích hoạt cơ chế định tuyến thông minh khi phát hiện SLA giảm sút dưới ngưỡng tiêu chuẩn.",
+                    "Đối chiếu dữ liệu đối soát tài khóa định kỳ vào cuối mỗi ca làm việc."
+                ]
+            }
+
+        # Assign primary artifact
+        if is_chart_requested and chart_artifact:
+            result["artifact"] = chart_artifact
+        elif is_report_requested and report_artifact:
+            result["artifact"] = report_artifact
+        elif chart_artifact:
+            result["artifact"] = chart_artifact
+        elif report_artifact:
+            result["artifact"] = report_artifact
+
+        result["available_artifacts"] = {
+            "chart": chart_artifact,
+            "report": report_artifact,
+        }
+        return result
+
 
     # =========================================================================
     # Engine 1: LLM NL2SQL Pipeline (Google Gemini / OpenAI)
@@ -639,13 +762,20 @@ class NLQueryEngine:
                 target_year = int(year_match.group(1))
             return self._handle_monthly_comparison_query(clean_q, q_lower, all_months[0], all_months[1], target_year)
 
-        # 0c. Daily Comparison ("so sánh hôm nay với hôm qua", "doanh thu hôm nay")
-        if any(k in q_lower for k in ["hôm nay với hôm qua", "hôm nay và hôm qua", "hôm nay so với hôm qua", "hôm qua so với hôm nay", "hôm nay với hôm trước", "doanh thu hôm nay", "doanh số hôm nay"]):
-            return self._handle_daily_comparison_query(clean_q, q_lower)
+        # 0b1. Universal Orders Engine (Handles: lớn nhất, nhỏ nhất, mới nhất, cũ nhất, hôm nay, tuần này, tháng này, năm nay, kênh, chi nhánh, tổng số đơn...)
+        if any(k in q_lower for k in [
+            "đơn hàng", "don hang", "đơn mới", "đơn lớn", "đơn nhỏ", "đơn gần", "đơn vừa",
+            "mới nhất là gì", "mới nhất", "gần nhất", "giá trị nhất", "lớn nhất", "nhỏ nhất",
+            "cao nhất", "thấp nhất", "đắt nhất", "rẻ nhất", "bao nhiêu đơn", "bao nhiêu đơn bị hủy",
+            "đơn bị hủy", "đơn huỷ", "số đơn hôm nay", "mấy đơn", "order", "orders"
+        ]) and not any(k in q_lower for k in ["sản phẩm", "doanh thu", "chiến dịch", "tiktok", "facebook", "nhân viên", "p&l", "lãi hay lỗ"]):
+            return self._handle_universal_orders_query(clean_q, q_lower)
 
-        # 0d. Orders Today & Cancellations ("hôm nay bao nhiêu đơn", "bao nhiêu đơn bị hủy")
-        if any(k in q_lower for k in ["hôm nay bao nhiêu đơn", "bao nhiêu đơn hôm nay", "đơn hàng hôm nay", "hôm nay mấy đơn", "số đơn hôm nay", "bao nhiêu đơn bị hủy", "đơn bị hủy", "đơn huỷ"]):
-            return self._handle_today_orders_query(clean_q, q_lower)
+        # 0b2. Universal Revenue Engine (Handles: doanh thu hôm nay, tuần này, tháng này, năm nay, theo kênh, theo chi nhánh...)
+        if any(k in q_lower for k in [
+            "doanh thu", "doanh số", "revenue", "tiền thu"
+        ]) and not any(k in q_lower for k in ["sản phẩm", "nhân viên", "chiến dịch", "p&l", "lãi hay lỗ"]):
+            return self._handle_universal_revenue_query(clean_q, q_lower)
 
         # 0e. Employee Performance & Sales Representatives ("nhân viên", "ai bán nhiều nhất")
         if any(k in q_lower for k in ["nhân viên", "nhan vien", "sales rep", "ai bán được nhiều nhất", "doanh thu theo nhân viên", "doanh số nhân viên", "hiệu suất nhân viên"]):
@@ -1684,8 +1814,429 @@ class NLQueryEngine:
             ],
         }
 
+    def _handle_universal_orders_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
+        """Comprehensive Universal Order Engine handling ranking, timeframes, statuses, channels, and aggregations."""
+        # 1. Detect Timeframe
+        time_filter = None
+        time_desc = "toàn thời gian"
+        
+        if any(k in q_lower for k in ["hôm nay", "ngay hom nay", "today"]):
+            time_filter = "DATE(o.order_timestamp) = (SELECT MAX(DATE(order_timestamp)) FROM orders)"
+            time_desc = "hôm nay (ngày mới nhất)"
+        elif any(k in q_lower for k in ["hôm qua", "hom qua", "yesterday"]):
+            time_filter = "DATE(o.order_timestamp) = (SELECT DATE(MAX(order_timestamp) - INTERVAL '1 day') FROM orders)"
+            time_desc = "ngày hôm qua"
+        elif any(k in q_lower for k in ["tuần này", "tuan nay", "7 ngày", "this week"]):
+            time_filter = "o.order_timestamp >= (SELECT MAX(order_timestamp) - INTERVAL '7 days' FROM orders)"
+            time_desc = "trong 7 ngày gần nhất (tuần này)"
+        elif any(k in q_lower for k in ["tháng này", "thang nay", "tháng hiện tại", "this month"]):
+            time_filter = "TO_CHAR(o.order_timestamp, 'YYYY-MM') = (SELECT TO_CHAR(MAX(order_timestamp), 'YYYY-MM') FROM orders)"
+            time_desc = "trong tháng này"
+        elif any(k in q_lower for k in ["tháng trước", "thang truoc", "tháng vừa rồi", "last month"]):
+            time_filter = "TO_CHAR(o.order_timestamp, 'YYYY-MM') = (SELECT TO_CHAR(MAX(order_timestamp) - INTERVAL '1 month', 'YYYY-MM') FROM orders)"
+            time_desc = "trong tháng trước"
+        elif re.search(r"tháng\s*(\d{1,2})", q_lower):
+            m_num = int(re.search(r"tháng\s*(\d{1,2})", q_lower).group(1))
+            time_filter = f"EXTRACT(MONTH FROM o.order_timestamp) = {m_num}"
+            time_desc = f"trong tháng {m_num}"
+        elif any(k in q_lower for k in ["năm nay", "nam nay", "2026"]):
+            time_filter = "EXTRACT(YEAR FROM o.order_timestamp) = 2026"
+            time_desc = "trong năm 2026"
+
+        # 2. Detect Status Filter
+        status_filter = None
+        status_desc = ""
+        if any(k in q_lower for k in ["bị hủy", "bi huy", "hủy đơn", "huy don", "đơn hủy", "cancelled"]):
+            status_filter = "o.order_status = 'Cancelled'"
+            status_desc = "bị hủy"
+        elif any(k in q_lower for k in ["thành công", "giao thành công", "thanh cong", "delivered"]):
+            status_filter = "o.order_status IN ('Delivered', 'Shipped', 'Fulfilled')"
+            status_desc = "giao thành công"
+        elif any(k in q_lower for k in ["hoàn tiền", "hoan tien", "refund"]):
+            status_filter = "o.order_status = 'Refunded'"
+            status_desc = "hoàn tiền"
+        elif any(k in q_lower for k in ["đang giao", "đang vận chuyển", "shipped"]):
+            status_filter = "o.order_status = 'Shipped'"
+            status_desc = "đang giao"
+        elif any(k in q_lower for k in ["đang xử lý", "processing"]):
+            status_filter = "o.order_status = 'Processing'"
+            status_desc = "đang xử lý"
+
+        # 3. Detect Channel / Store Filter
+        channel_filter = None
+        channel_desc = ""
+        if any(k in q_lower for k in ["online", "trực tuyến", "truc tuyen", "app", "web", "website", "tiktok"]):
+            channel_filter = "o.channel IN ('Online', 'Website', 'Mobile App', 'TikTok Shop', 'App')"
+            channel_desc = "kênh Online"
+        elif any(k in q_lower for k in ["tại quầy", "tai quay", "cửa hàng", "cua hang", "offline", "store"]):
+            channel_filter = "o.channel = 'Store'"
+            channel_desc = "kênh Cửa hàng (Offline)"
+
+        store_filter = None
+        store_desc = ""
+        for b_name in ["Cầu Giấy", "Hoàn Kiếm", "Quận 1", "Tân Bình", "Đà Nẵng", "Cần Thơ"]:
+            if b_name.lower() in q_lower:
+                store_filter = f"s.store_name ILIKE '%%{b_name}%%'"
+                store_desc = f"Chi nhánh {b_name}"
+                break
+
+        # 4. Check if Aggregate Query
+        is_aggregate = any(k in q_lower for k in [
+            "bao nhiêu đơn", "bao nhieu don", "tổng số đơn", "tong so don", "số lượng đơn",
+            "đếm đơn", "mấy đơn", "may don", "tổng đơn", "tong don", "tổng giá trị đơn"
+        ])
+
+        where_clauses = []
+        if time_filter:
+            where_clauses.append(time_filter)
+        if status_filter:
+            where_clauses.append(status_filter)
+        if channel_filter:
+            where_clauses.append(channel_filter)
+        if store_filter:
+            where_clauses.append(store_filter)
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        qualifiers = " ".join(filter(None, [status_desc, channel_desc, store_desc, time_desc]))
+
+        if is_aggregate:
+            sql = f"""
+                SELECT 
+                    COUNT(o.order_id) AS total_orders,
+                    COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN 1 END) AS successful_orders,
+                    COUNT(CASE WHEN o.order_status = 'Cancelled' THEN 1 END) AS cancelled_orders,
+                    COALESCE(SUM(o.total_amount), 0) AS total_revenue,
+                    COALESCE(AVG(o.total_amount), 0) AS avg_amount
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                {where_sql};
+            """
+            rows = execute_analyst_query(sql)
+            r = rows[0] if rows else {}
+            tot = int(r.get("total_orders", 0))
+            succ = int(r.get("successful_orders", 0))
+            canc = int(r.get("cancelled_orders", 0))
+            rev = float(r.get("total_revenue", 0.0))
+            avg_val = float(r.get("avg_amount", 0.0))
+
+            answer = (
+                f"📊 **Thống kê Số lượng Đơn hàng ({qualifiers})**:\n\n"
+                f"• **Tổng số đơn hàng**: **{tot:,} đơn**\n"
+            )
+            if tot > 0:
+                answer += f"• **Giao thành công**: **{succ:,} đơn** ({succ/tot*100:.1f}%)\n"
+                if canc > 0:
+                    answer += f"• **Đơn bị hủy**: **{canc:,} đơn** ({canc/tot*100:.1f}%)\n"
+            answer += (
+                f"• **Tổng giá trị ghi nhận**: **{rev:,.2f} VND**\n"
+                f"• **Giá trị trung bình/đơn (AOV)**: **{avg_val:,.2f} VND**"
+            )
+
+            data = [
+                {"Chỉ tiêu": f"Tổng đơn hàng ({qualifiers})", "Số lượng/Giá trị": f"{tot:,} đơn"},
+                {"Chỉ tiêu": "Đơn thành công", "Số lượng/Giá trị": f"{succ:,} đơn"},
+                {"Chỉ tiêu": "Đơn bị hủy", "Số lượng/Giá trị": f"{canc:,} đơn"},
+                {"Chỉ tiêu": "Tổng giá trị", "Số lượng/Giá trị": f"{rev:,.2f} VND"},
+                {"Chỉ tiêu": "Giá trị trung bình (AOV)", "Số lượng/Giá trị": f"{avg_val:,.2f} VND"},
+            ]
+
+            return {
+                "question": clean_q,
+                "status": "SUCCESS",
+                "mode": "UniversalSemanticEngine",
+                "domain": "Sales",
+                "answer": answer,
+                "sql_query": sql.strip(),
+                "data": data,
+                "suggested_followups": [
+                    "Đơn hàng lớn nhất trong khoảng thời gian này",
+                    "Đơn hàng mới nhất là gì",
+                    "Doanh thu theo kênh bán hàng",
+                ],
+            }
+
+        # Order Listing / Top
+        order_by = "o.order_timestamp DESC"
+        rank_label = "mới nhất"
+
+        if any(k in q_lower for k in ["lớn nhất", "lon nhat", "cao nhất", "cao nhat", "giá trị nhất", "gia tri nhat", "đắt nhất", "dat nhat", "khủng nhất", "nhiều tiền nhất", "nhiều nhất"]):
+            order_by = "o.total_amount DESC"
+            rank_label = "giá trị lớn nhất"
+        elif any(k in q_lower for k in ["nhỏ nhất", "nho nhat", "thấp nhất", "thap nhat", "rẻ nhất", "re nhat", "ít tiền nhất", "ít nhất"]):
+            order_by = "o.total_amount ASC"
+            rank_label = "giá trị nhỏ nhất"
+        elif any(k in q_lower for k in ["cũ nhất", "cu nhat", "sớm nhất", "som nhat", "đầu tiên"]):
+            order_by = "o.order_timestamp ASC"
+            rank_label = "sớm nhất"
+
+        limit = 5
+        top_match = re.search(r"top\s*(\d+)", q_lower)
+        if top_match:
+            limit = min(50, max(1, int(top_match.group(1))))
+
+        sql = f"""
+            SELECT 
+                o.order_id,
+                o.order_timestamp,
+                o.channel,
+                o.order_status,
+                o.total_amount,
+                COALESCE(c.customer_segment, 'Standard') AS customer_segment,
+                COALESCE(c.region, 'Toàn quốc') AS customer_region,
+                COALESCE(s.store_name, 'Kênh Trực tuyến') AS store_name
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.customer_id
+            LEFT JOIN stores s ON o.store_id = s.store_id
+            {where_sql}
+            ORDER BY {order_by}
+            LIMIT {limit};
+        """
+        rows = execute_analyst_query(sql)
+        qualifiers_full = " ".join(filter(None, [rank_label, status_desc, channel_desc, store_desc, time_desc]))
+
+        if not rows:
+            return {
+                "question": clean_q,
+                "status": "SUCCESS",
+                "mode": "UniversalSemanticEngine",
+                "domain": "Sales",
+                "answer": f"Không tìm thấy đơn hàng nào phù hợp với tiêu chí ({qualifiers_full}).",
+                "sql_query": sql.strip(),
+                "data": [],
+                "suggested_followups": [
+                    "Đơn hàng mới nhất là gì",
+                    "Đơn hàng giá trị nhất ngày hôm nay",
+                    "Xem báo cáo KPI toàn hệ thống",
+                ],
+            }
+
+        top1 = rows[0]
+        oid = str(top1["order_id"])[:8]
+        ots = top1["order_timestamp"].strftime("%H:%M:%S ngày %d/%m/%Y")
+        amt = float(top1["total_amount"])
+        channel = top1["channel"]
+        status = top1["order_status"]
+        segment = top1["customer_segment"]
+        region = top1["customer_region"]
+        store = top1["store_name"]
+
+        answer = (
+            f"📦 **Đơn hàng {qualifiers_full} được ghi nhận**:\n\n"
+            f"• **Mã đơn hàng**: `#{oid}`\n"
+            f"• **Giá trị thanh toán**: **{amt:,.2f} VND**\n"
+            f"• **Thời điểm tạo đơn**: **{ots}**\n"
+            f"• **Kênh mua hàng**: **{channel}** ({store})\n"
+            f"• **Trạng thái đơn**: **{status}**\n"
+            f"• **Khách hàng**: Phân khúc **{segment}** ({region})\n\n"
+            f"Danh sách Top {len(rows)} đơn hàng phù hợp được hiển thị chi tiết trong bảng dữ liệu dưới đây."
+        )
+
+        data = [
+            {
+                "Mã đơn": str(r["order_id"])[:8],
+                "Thời gian": r["order_timestamp"].strftime("%H:%M:%S %d/%m/%Y"),
+                "Kênh": r["channel"],
+                "Trạng thái": r["order_status"],
+                "Giá trị (VND)": f"{float(r['total_amount']):,.2f}",
+                "Chi nhánh": r["store_name"],
+                "Phân khúc": r["customer_segment"],
+            }
+            for r in rows
+        ]
+
+        return {
+            "question": clean_q,
+            "status": "SUCCESS",
+            "mode": "UniversalSemanticEngine",
+            "domain": "Sales",
+            "answer": answer,
+            "sql_query": sql.strip(),
+            "data": data,
+            "suggested_followups": [
+                "Đơn hàng mới nhất là gì",
+                "Đơn hàng giá trị nhất ngày hôm nay",
+                "Báo cáo kết quả kinh doanh P&L",
+            ],
+        }
+
+    def _handle_universal_revenue_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
+        """Comprehensive Universal Revenue Engine handling all temporal and channel/branch dimensions."""
+        time_filter = None
+        time_desc = "toàn thời gian"
+        if any(k in q_lower for k in ["hôm nay", "ngay hom nay", "today"]):
+            time_filter = "DATE(o.order_timestamp) = (SELECT MAX(DATE(order_timestamp)) FROM orders)"
+            time_desc = "hôm nay (ngày mới nhất)"
+        elif any(k in q_lower for k in ["hôm qua", "hom qua", "yesterday"]):
+            time_filter = "DATE(o.order_timestamp) = (SELECT DATE(MAX(order_timestamp) - INTERVAL '1 day') FROM orders)"
+            time_desc = "ngày hôm qua"
+        elif any(k in q_lower for k in ["tuần này", "tuan nay", "7 ngày", "this week"]):
+            time_filter = "o.order_timestamp >= (SELECT MAX(order_timestamp) - INTERVAL '7 days' FROM orders)"
+            time_desc = "trong 7 ngày gần nhất (tuần này)"
+        elif any(k in q_lower for k in ["tháng này", "thang nay", "tháng hiện tại", "this month"]):
+            time_filter = "TO_CHAR(o.order_timestamp, 'YYYY-MM') = (SELECT TO_CHAR(MAX(order_timestamp), 'YYYY-MM') FROM orders)"
+            time_desc = "trong tháng này (tháng 9/2026)"
+        elif any(k in q_lower for k in ["tháng trước", "thang truoc", "last month"]):
+            time_filter = "TO_CHAR(o.order_timestamp, 'YYYY-MM') = (SELECT TO_CHAR(MAX(order_timestamp) - INTERVAL '1 month', 'YYYY-MM') FROM orders)"
+            time_desc = "trong tháng trước (tháng 8/2026)"
+        elif re.search(r"tháng\s*(\d{1,2})", q_lower):
+            m_num = int(re.search(r"tháng\s*(\d{1,2})", q_lower).group(1))
+            time_filter = f"EXTRACT(MONTH FROM o.order_timestamp) = {m_num}"
+            time_desc = f"trong tháng {m_num}"
+        elif any(k in q_lower for k in ["năm nay", "2026"]):
+            time_filter = "EXTRACT(YEAR FROM o.order_timestamp) = 2026"
+            time_desc = "trong năm 2026"
+
+        where_time = f"WHERE {time_filter}" if time_filter else ""
+
+        if any(k in q_lower for k in ["theo kênh", "từng kênh", "kênh bán"]):
+            sql = f"""
+                SELECT 
+                    o.channel,
+                    COUNT(o.order_id) AS total_orders,
+                    COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN 1 END) AS successful_orders,
+                    COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN o.total_amount ELSE 0 END), 0) AS recognized_revenue
+                FROM orders o
+                {where_time}
+                GROUP BY o.channel
+                ORDER BY recognized_revenue DESC;
+            """
+            rows = execute_analyst_query(sql)
+            tot_rev = sum(float(r["recognized_revenue"]) for r in rows)
+            top_ch = rows[0]["channel"] if rows else "N/A"
+            answer = (
+                f"📊 **Cơ cấu Doanh thu theo Kênh bán hàng {time_desc}**:\n\n"
+                f"• **Tổng doanh thu thực nhận**: **{tot_rev:,.2f} VND**\n"
+            )
+            if rows and tot_rev > 0:
+                answer += f"• **Kênh dẫn đầu**: **{top_ch}** với **{float(rows[0]['recognized_revenue']):,.2f} VND** ({float(rows[0]['recognized_revenue'])/tot_rev*100:.1f}%)"
+
+            data = [
+                {
+                    "Kênh bán": r["channel"],
+                    "Số đơn": int(r["total_orders"]),
+                    "Đơn thành công": int(r["successful_orders"]),
+                    "Doanh thu (VND)": f"{float(r['recognized_revenue']):,.2f}",
+                    "Tỷ trọng": f"{float(r['recognized_revenue'])/tot_rev*100:.1f}%" if tot_rev > 0 else "0.0%"
+                }
+                for r in rows
+            ]
+            return {
+                "question": clean_q,
+                "status": "SUCCESS",
+                "mode": "UniversalSemanticEngine",
+                "domain": "Finance",
+                "answer": answer,
+                "sql_query": sql.strip(),
+                "data": data,
+                "suggested_followups": [
+                    "Đơn hàng lớn nhất tháng này",
+                    "Doanh thu theo chi nhánh",
+                    "Báo cáo kết quả kinh doanh P&L",
+                ],
+            }
+
+        elif any(k in q_lower for k in ["chi nhánh", "cửa hàng"]):
+            sql = f"""
+                SELECT 
+                    COALESCE(s.store_name, 'Kênh Trực tuyến') AS store_name,
+                    COUNT(o.order_id) AS total_orders,
+                    COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN o.total_amount ELSE 0 END), 0) AS recognized_revenue
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                {where_time}
+                GROUP BY s.store_name
+                ORDER BY recognized_revenue DESC;
+            """
+            rows = execute_analyst_query(sql)
+            tot_rev = sum(float(r["recognized_revenue"]) for r in rows)
+            top_st = rows[0]["store_name"] if rows else "N/A"
+            answer = (
+                f"🏢 **Doanh thu theo Chi nhánh / Điểm bán {time_desc}**:\n\n"
+                f"• **Tổng doanh thu**: **{tot_rev:,.2f} VND**\n"
+            )
+            if rows:
+                answer += f"• **Chi nhánh dẫn đầu**: **{top_st}** với **{float(rows[0]['recognized_revenue']):,.2f} VND**"
+
+            data = [
+                {
+                    "Điểm bán": r["store_name"],
+                    "Tổng số đơn": int(r["total_orders"]),
+                    "Doanh thu (VND)": f"{float(r['recognized_revenue']):,.2f}",
+                }
+                for r in rows
+            ]
+            return {
+                "question": clean_q,
+                "status": "SUCCESS",
+                "mode": "UniversalSemanticEngine",
+                "domain": "Finance",
+                "answer": answer,
+                "sql_query": sql.strip(),
+                "data": data,
+                "suggested_followups": [
+                    "Đơn hàng lớn nhất tháng này",
+                    "Doanh thu theo kênh bán",
+                ],
+            }
+
+        sql = f"""
+            SELECT 
+                COUNT(o.order_id) AS total_orders,
+                COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN 1 END) AS successful_orders,
+                COUNT(CASE WHEN o.order_status = 'Cancelled' THEN 1 END) AS cancelled_orders,
+                COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN o.total_amount ELSE 0 END), 0) AS recognized_revenue,
+                COALESCE(SUM(o.total_amount), 0) AS gross_sales,
+                COALESCE(AVG(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled') THEN o.total_amount END), 0) AS aov
+            FROM orders o
+            {where_time};
+        """
+        rows = execute_analyst_query(sql)
+        r = rows[0] if rows else {}
+        rec_rev = float(r.get("recognized_revenue", 0.0))
+        gross = float(r.get("gross_sales", 0.0))
+        tot_ord = int(r.get("total_orders", 0))
+        succ_ord = int(r.get("successful_orders", 0))
+        canc_ord = int(r.get("cancelled_orders", 0))
+        aov = float(r.get("aov", 0.0))
+
+        answer = (
+            f"💰 **Báo cáo Doanh thu Doanh nghiệp {time_desc}**:\n\n"
+            f"• **Doanh thu thực nhận**: **{rec_rev:,.2f} VND**\n"
+            f"• **Tổng giá trị đơn đặt (Gross Sales)**: **{gross:,.2f} VND**\n"
+            f"• **Quy mô đơn hàng**: **{tot_ord:,} đơn** ({succ_ord:,} thành công, {canc_ord:,} đơn hủy)\n"
+            f"• **Giá trị trung bình/đơn (AOV)**: **{aov:,.2f} VND**"
+        )
+        data = [
+            {"Chỉ số": f"Doanh thu thực nhận {time_desc}", "Giá trị": f"{rec_rev:,.2f} VND"},
+            {"Chỉ số": "Tổng doanh số đặt hàng (Gross)", "Giá trị": f"{gross:,.2f} VND"},
+            {"Chỉ số": "Số đơn thành công", "Giá trị": f"{succ_ord:,} đơn"},
+            {"Chỉ số": "Số đơn bị hủy", "Giá trị": f"{canc_ord:,} đơn"},
+            {"Chỉ số": "Giá trị trung bình/đơn (AOV)", "Giá trị": f"{aov:,.2f} VND"},
+        ]
+        return {
+            "question": clean_q,
+            "status": "SUCCESS",
+            "mode": "UniversalSemanticEngine",
+            "domain": "Finance",
+            "answer": answer,
+            "sql_query": sql.strip(),
+            "data": data,
+            "suggested_followups": [
+                "Đơn hàng lớn nhất tháng này",
+                "Doanh thu theo kênh bán hàng",
+                "Báo cáo kết quả kinh doanh P&L",
+            ],
+        }
+
+    def _handle_latest_orders_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
+        return self._handle_universal_orders_query(clean_q, q_lower)
+
+    def _handle_top_order_today_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
+        return self._handle_universal_orders_query(clean_q, q_lower)
+
     def _handle_today_orders_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
-        """Answers queries about orders today (2026-08-28), order status breakdown and cancellations."""
+        """Answers queries about orders today, order status breakdown and cancellations."""
         sql = """
             SELECT 
                 COUNT(order_id) AS total_today,
@@ -1694,7 +2245,7 @@ class NLQueryEngine:
                 COALESCE(SUM(CASE WHEN order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN total_amount ELSE 0 END), 0) AS today_revenue,
                 COALESCE(SUM(CASE WHEN order_status = 'Cancelled' THEN total_amount ELSE 0 END), 0) AS cancelled_amount
             FROM orders
-            WHERE DATE(order_timestamp) = '2026-08-28';
+            WHERE DATE(order_timestamp) = (SELECT MAX(DATE(order_timestamp)) FROM orders);
         """
         rows = execute_analyst_query(sql)
         r = rows[0] if rows else {}
@@ -2498,6 +3049,28 @@ class NLQueryEngine:
         elif "20" in q_lower:
             limit = 20
 
+        # Timeframe filter
+        time_filter = ""
+        time_desc = "Toàn Hệ thống"
+        if any(k in q_lower for k in ["tháng này", "this month"]):
+            time_filter = "AND TO_CHAR(o.order_timestamp, 'YYYY-MM') = (SELECT TO_CHAR(MAX(order_timestamp), 'YYYY-MM') FROM orders)"
+            time_desc = "trong Tháng này"
+        elif any(k in q_lower for k in ["hôm nay", "today"]):
+            time_filter = "AND DATE(o.order_timestamp) = (SELECT MAX(DATE(order_timestamp)) FROM orders)"
+            time_desc = "trong Ngày hôm nay"
+        elif any(k in q_lower for k in ["tuần này", "this week"]):
+            time_filter = "AND o.order_timestamp >= (SELECT MAX(order_timestamp) - INTERVAL '7 days' FROM orders)"
+            time_desc = "trong 7 Ngày gần nhất"
+
+        order_by = "total_revenue DESC"
+        sort_desc = "Doanh thu Cao nhất"
+        if any(k in q_lower for k in ["bán chạy", "bán nhiều", "số lượng nhiều"]):
+            order_by = "total_sold DESC"
+            sort_desc = "Số lượng Bán Chạy nhất"
+        elif any(k in q_lower for k in ["bán ít", "bán ế", "ít nhất", "ế nhất"]):
+            order_by = "total_sold ASC"
+            sort_desc = "Số lượng Bán Thấp nhất"
+
         sql = f"""
             SELECT 
                 p.product_name,
@@ -2510,15 +3083,16 @@ class NLQueryEngine:
             JOIN order_items oi ON p.product_id = oi.product_id
             JOIN orders o ON oi.order_id = o.order_id
             WHERE o.order_status IN ('Delivered', 'Shipped', 'Fulfilled')
+              {time_filter}
             GROUP BY p.product_name, c.category_name
-            ORDER BY total_revenue DESC
+            ORDER BY {order_by}
             LIMIT {limit};
         """
         rows = execute_analyst_query(sql)
 
         answer = (
-            f"**Top {limit} Sản phẩm Đạt Doanh thu Cao nhất Toàn Hệ thống**:\n\n"
-            f"Các dòng sản phẩm công nghệ cao (Laptop, Màn hình, Smartphone, Thiết bị mạng) chiếm tỷ trọng doanh thu vượt trội, "
+            f"**Top {limit} Sản phẩm Đạt {sort_desc} {time_desc}**:\n\n"
+            f"Các dòng sản phẩm công nghệ cao (Laptop, Màn hình, Smartphone, Thiết bị mạng) chiếm tỷ trọng chủ đạo, "
             f"với biên lợi nhuận gộp danh định dao động trong khoảng 15% - 32%."
         )
 

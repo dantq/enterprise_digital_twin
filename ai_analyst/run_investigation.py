@@ -85,7 +85,7 @@ def main():
             for f in sres["findings"][:2]:
                 print(f"      - {f}")
 
-        print("\n[PHASE 2] ADVERSARIAL CRITIQUE & INVARIANT AUDIT...")
+        print("\n[PHASE 2] ADVERSARIAL CRITIQUE & INVARIANT AUDIT (Layer 1: Critics vs Specialists)...")
         ev = investigation["evidence_critique"]
         ca = investigation["causal_critique"]
         for crit in ev.get("critiques", []):
@@ -93,6 +93,34 @@ def main():
         for temp in ca.get("temporal_checks", []):
             print(f"  • CausalCritic   [{'PASSED' if temp['valid'] else 'FAILED'}]: {temp['notes']}")
         print(f"  • Causal DAG Strict Acyclicity: {'PASSED (Kahn DAG verified)' if ca.get('acyclicity_verified') else 'FAILED'}")
+
+        print("\n[PHASE 2.5] TANG BAT LOI THU HAI — Cross-Critic Mutual Audit...")
+        cross = investigation.get("cross_critic_audit", {})
+        ev_cross = cross.get("evidence_audits_causal", {})
+        ca_cross = cross.get("causal_audits_evidence", {})
+
+        ev_verdict = ev_cross.get("overall_verdict", "N/A")
+        ca_verdict = ca_cross.get("overall_verdict", "N/A")
+        ev_symbol = "✅" if ev_verdict == "CAUSAL_VERDICT_ENDORSED" else "⚠️" if "FLAGGED" in ev_verdict else "🔴"
+        ca_symbol = "✅" if ca_verdict == "EVIDENCE_VERDICT_ENDORSED" else "⚠️" if "FLAGGED" in ca_verdict else "🔴"
+
+        print(f"  • EvidenceCritic audits CausalCritic : {ev_symbol} {ev_verdict}")
+        for f in ev_cross.get("findings", []):
+            sym = "  ✅" if f["verdict"] == "PASSED" else "  ⚠️"
+            print(f"    {sym} [{f['check']}]: {f['verdict']} (severity: {f.get('severity','NONE')})")
+
+        print(f"  • CausalCritic audits EvidenceCritic : {ca_symbol} {ca_verdict}")
+        for f in ca_cross.get("findings", []):
+            sym = "  ✅" if f["verdict"] == "PASSED" else "  ⚠️"
+            print(f"    {sym} [{f['check']}]: {f['verdict']} (severity: {f.get('severity','NONE')})")
+
+        overruled = investigation["rca_report"].get("cross_critic_audit", {}).get("overruled_verdicts", [])
+        if overruled:
+            print(f"\n  ⚡ OVERRULE ACTIONS ({len(overruled)}):")
+            for ov in overruled:
+                print(f"    • {ov['overruled_agent']} overruled by {ov['overruled_by']}: {ov['reason']}")
+        else:
+            print("  ✅ No overrule actions — both Critics endorsed each other.")
 
         print("\n[PHASE 3] FINAL SYNTHESIS & RCA GENERATION...")
         rca = investigation["rca_report"]
@@ -105,6 +133,17 @@ def main():
         print(f"  • Action Recommendations ({len(rca['recommended_actions'])} items):")
         for act in rca["recommended_actions"]:
             print(f"      ✔ {act}")
+
+        # Accountability Log
+        acc_log = rca.get("accountability_log", [])
+        if acc_log:
+            print(f"\n  📋 ACCOUNTABILITY LOG ({len(acc_log)} errors recorded):")
+            print(f"  {'Faulty Agent':<30} {'Error Type':<35} {'Caught By':<35}")
+            print(f"  {'-'*30} {'-'*35} {'-'*35}")
+            for row in acc_log:
+                print(f"  {row['faulty_agent']:<30} {row['error_type']:<35} {row['caught_by']:<35}")
+        else:
+            print("\n  📋 ACCOUNTABILITY LOG: No errors detected across all 6 agents.")
 
         # Save Markdown Report
         report_file = reports_dir / f"RCA_{domain}_{inc_id[:8]}.md"
@@ -126,6 +165,7 @@ def main():
                 print(f"  • Benchmark error: {scorecard.get('error') if scorecard else 'No scorecard'}")
 
         print("\n" + "=" * 80 + "\n")
+
 
     print("[SUCCESS] ALL ACTIVE INCIDENT INVESTIGATIONS COMPLETED.")
 

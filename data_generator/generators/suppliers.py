@@ -1,4 +1,4 @@
-﻿import random
+import random
 
 from db import get_connection
 from config import SUPPLIERS, SEED

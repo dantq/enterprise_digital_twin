@@ -1,4 +1,4 @@
-﻿import random
+import random
 from datetime import date, timedelta
 
 from db import get_connection

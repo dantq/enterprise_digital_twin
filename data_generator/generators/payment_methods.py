@@ -1,4 +1,4 @@
-﻿from db import get_connection
+from db import get_connection
 from config import PAYMENT_METHODS, SEED
 
 import random

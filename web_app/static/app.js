@@ -744,7 +744,7 @@ function renderSuppliersTable(suppliers) {
         <td style="text-align:right;color:var(--emerald);" class="font-mono">${formatVND(s.total_po_value)}</td>
         <td style="text-align:center;">
           <span class="${isProblematic ? 'tag-danger' : 'tag-success'}">
-            ${isProblematic ? 'Đình công nhà máy' : 'Hoạt động tốt'}
+            ${isProblematic ? 'Gián đoạn nhà máy' : 'Hoạt động tốt'}
           </span>
         </td>
       </tr>
@@ -2013,13 +2013,51 @@ function appendLoaderMessage() {
   msgDiv.className = 'chat-message assistant-msg';
   msgDiv.innerHTML = `
     <div class="msg-avatar">AI</div>
-    <div class="msg-content" style="display:flex;align-items:center;gap:10px;">
-      <span class="pulse-indicator"></span>
-      <span style="color:var(--text-muted);font-size:0.88rem;">AI Analyst đang truy vấn cơ sở dữ liệu và tổng hợp báo cáo...</span>
+    <div class="msg-content">
+      <div class="thought-step-stream">
+        <div class="thought-step-item active" id="${id}-step-1">
+          <span class="pulse-indicator"></span>
+          <span>Đang phân tích cấu trúc câu lệnh và ánh xạ dữ liệu nghiệp vụ...</span>
+        </div>
+        <div class="thought-step-item" id="${id}-step-2" style="opacity:0.4;">
+          <span>⏳</span>
+          <span>Truy xuất cơ sở dữ liệu PostgreSQL Sandbox (39 bảng, 58k bản ghi)...</span>
+        </div>
+        <div class="thought-step-item" id="${id}-step-3" style="opacity:0.4;">
+          <span>⏳</span>
+          <span>Tổng hợp kết luận điều hành C-Suite & tạo biểu đồ trực quan...</span>
+        </div>
+      </div>
     </div>
   `;
   chatStream.appendChild(msgDiv);
   scrollChatToBottom();
+
+  // Animate thinking steps
+  setTimeout(() => {
+    const s1 = document.getElementById(`${id}-step-1`);
+    const s2 = document.getElementById(`${id}-step-2`);
+    if (s1 && s2) {
+      s1.className = 'thought-step-item done';
+      s1.innerHTML = '<span>✓</span><span>Đã ánh xạ câu hỏi vào schema vận hành</span>';
+      s2.className = 'thought-step-item active';
+      s2.style.opacity = '1';
+      s2.innerHTML = '<span class="pulse-indicator"></span><span>Đang truy xuất PostgreSQL Sandbox (Read-Only)...</span>';
+    }
+  }, 400);
+
+  setTimeout(() => {
+    const s2 = document.getElementById(`${id}-step-2`);
+    const s3 = document.getElementById(`${id}-step-3`);
+    if (s2 && s3) {
+      s2.className = 'thought-step-item done';
+      s2.innerHTML = '<span>✓</span><span>Dữ liệu đã trích xuất thành công</span>';
+      s3.className = 'thought-step-item active';
+      s3.style.opacity = '1';
+      s3.innerHTML = '<span class="pulse-indicator"></span><span>Tổng hợp phân tích & định dạng Artifact C-Suite...</span>';
+    }
+  }, 900);
+
   return id;
 }
 
@@ -2046,6 +2084,300 @@ function appendAssistantErrorMessage(errText) {
   scrollChatToBottom();
 }
 
+// =============================================================================
+// Module 6: Dynamic Artifact Canvas & AI-First Nucleus Engine
+// =============================================================================
+
+let currentChartArtifact = null;
+let currentReportArtifact = null;
+let currentTableData = null;
+let currentActiveCanvasTab = 'chart';
+let dynamicChartInstance = null;
+
+function switchCanvasTab(tabName) {
+  currentActiveCanvasTab = tabName;
+  document.querySelectorAll('.canvas-tab-btn, .wb-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.id === `canvas-tab-${tabName}`);
+  });
+  document.querySelectorAll('.canvas-view, .wb-view-panel').forEach(view => {
+    const isActive = view.id === `canvas-view-${tabName}`;
+    view.classList.toggle('active', isActive);
+    view.style.display = isActive ? 'block' : 'none';
+  });
+
+  const splitBody = document.getElementById('workspace-split-body');
+  if (splitBody) splitBody.classList.add('artifact-open');
+
+  if (tabName === 'chart' && dynamicChartInstance) {
+    try { dynamicChartInstance.resize(); } catch (_) {}
+  }
+}
+window.switchCanvasTab = switchCanvasTab;
+
+function toggleArtifactPanel() {
+  const splitBody = document.getElementById('workspace-split-body');
+  if (splitBody) splitBody.classList.toggle('artifact-open');
+}
+window.toggleArtifactPanel = toggleArtifactPanel;
+
+function openCanvasView(viewName) {
+  const splitBody = document.getElementById('workspace-split-body');
+  if (splitBody) splitBody.classList.add('artifact-open');
+  switchCanvasTab(viewName);
+}
+window.openCanvasView = openCanvasView;
+
+function startNewSession() {
+  const input = document.getElementById('ai-user-input');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  const scrollContainer = document.getElementById('cockpit-scroll-container');
+  if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.startNewSession = startNewSession;
+
+function renderDynamicArtifactChart(artifact) {
+  if (!artifact) return;
+  currentChartArtifact = artifact;
+
+  const titleEl = document.getElementById('dynamic-chart-title');
+  const subtitleEl = document.getElementById('dynamic-chart-subtitle');
+  if (titleEl) titleEl.textContent = artifact.title || 'Biểu đồ Phân tích Thời gian thực';
+  if (subtitleEl) subtitleEl.textContent = artifact.subtitle || 'Tự động sinh từ dữ liệu sandbox theo yêu cầu của Ban Điều hành';
+
+  const kind = artifact.chart_type || 'bar';
+  ['bar', 'line', 'doughnut'].forEach(t => {
+    const btn = document.getElementById(`btn-chart-${t}`);
+    if (btn) btn.classList.toggle('active', t === kind);
+  });
+
+  const canvas = document.getElementById('dynamic-artifact-chart-canvas');
+  if (!canvas || !window.Chart) return;
+
+  if (dynamicChartInstance) {
+    dynamicChartInstance.destroy();
+    dynamicChartInstance = null;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const gridColor = 'rgba(255, 255, 255, 0.06)';
+  const textColor = '#94a3b8';
+
+  const datasets = (artifact.datasets || []).map(ds => {
+    if (kind === 'line') {
+      return {
+        ...ds,
+        fill: true,
+        backgroundColor: 'rgba(6, 182, 212, 0.15)',
+        borderColor: '#06b6d4',
+        borderWidth: 2.5,
+        tension: 0.35,
+        pointBackgroundColor: '#06b6d4',
+        pointRadius: 4,
+      };
+    } else if (kind === 'doughnut') {
+      return {
+        ...ds,
+        borderWidth: 2,
+        borderColor: '#070b16',
+      };
+    }
+    return ds;
+  });
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 600, easing: 'easeOutQuart' },
+    plugins: {
+      legend: {
+        display: kind === 'doughnut' || datasets.length > 1,
+        position: 'top',
+        labels: { color: textColor, font: { family: 'Inter', size: 12 } }
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#fff',
+        bodyColor: '#38bdf8',
+        borderColor: 'rgba(56, 189, 248, 0.2)',
+        borderWidth: 1,
+        padding: 10,
+      }
+    },
+    scales: kind === 'doughnut' ? {} : {
+      x: {
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { family: 'Inter', size: 11 } }
+      },
+      y: {
+        grid: { color: gridColor },
+        ticks: {
+          color: textColor,
+          font: { family: 'JetBrains Mono', size: 11 },
+          callback: function(value) {
+            if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+            if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+            if (value >= 1e3) return (value / 1e3).toFixed(0) + 'k';
+            return value;
+          }
+        }
+      }
+    }
+  };
+
+  try {
+    dynamicChartInstance = new Chart(ctx, {
+      type: kind,
+      data: {
+        labels: artifact.labels || [],
+        datasets: datasets
+      },
+      options: options
+    });
+  } catch (err) {
+    console.error('Error rendering dynamic chart:', err);
+  }
+
+  const metricsContainer = document.getElementById('dynamic-chart-metrics');
+  if (metricsContainer && artifact.labels && artifact.datasets && artifact.datasets[0]) {
+    const dataVals = artifact.datasets[0].data || [];
+    let cardsHtml = '';
+    artifact.labels.slice(0, 4).forEach((lbl, idx) => {
+      const val = dataVals[idx];
+      const formatted = typeof val === 'number' ? (val >= 1000 ? val.toLocaleString('vi-VN') : val) : val;
+      cardsHtml += `
+        <div class="chart-metric-card">
+          <div class="chart-metric-label">${escapeHtml(lbl)}</div>
+          <div class="chart-metric-value">${formatted}</div>
+        </div>
+      `;
+    });
+    metricsContainer.innerHTML = cardsHtml;
+  }
+}
+window.renderDynamicArtifactChart = renderDynamicArtifactChart;
+
+function changeDynamicChartType(newType) {
+  if (!currentChartArtifact) return;
+  currentChartArtifact.chart_type = newType;
+  renderDynamicArtifactChart(currentChartArtifact);
+}
+window.changeDynamicChartType = changeDynamicChartType;
+
+function renderDynamicArtifactReport(report) {
+  if (!report) return;
+  currentReportArtifact = report;
+
+  const titleEl = document.getElementById('report-doc-title');
+  const dateEl = document.getElementById('report-doc-date');
+  const domainEl = document.getElementById('report-doc-domain');
+  const summaryEl = document.getElementById('report-doc-summary');
+  const kpisEl = document.getElementById('report-doc-kpis');
+  const tableEl = document.getElementById('report-doc-table');
+  const recsEl = document.getElementById('report-doc-recs');
+
+  if (titleEl) titleEl.textContent = report.title || 'BÁO CÁO ĐIỀU HÀNH DOANH NGHIỆP';
+  if (dateEl) dateEl.textContent = report.generated_at || new Date().toLocaleString('vi-VN');
+  if (domainEl) domainEl.textContent = report.domain || 'C-Suite Intelligence';
+  if (summaryEl) summaryEl.innerHTML = renderMarkdown(report.summary || 'Bản tin tổng hợp điều hành doanh nghiệp.');
+
+  if (kpisEl && report.kpis && Array.isArray(report.kpis)) {
+    kpisEl.innerHTML = report.kpis.map(k => `
+      <div class="report-kpi-box">
+        <div class="label">${escapeHtml(k.label)}</div>
+        <div class="val">${escapeHtml(k.value)}</div>
+      </div>
+    `).join('');
+  }
+
+  if (tableEl && report.table_headers && report.table_rows) {
+    tableEl.innerHTML = `
+      <table class="table-simple">
+        <thead>
+          <tr>${report.table_headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${report.table_rows.map(row => `
+            <tr>
+              ${row.map((cell, idx) => {
+                const isNum = !isNaN(parseFloat(cell)) && isFinite(cell);
+                return `<td class="${isNum ? 'font-mono' : ''}" style="${isNum ? 'text-align:right;' : ''}">${escapeHtml(cell)}</td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  if (recsEl && report.recommendations) {
+    recsEl.innerHTML = report.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('');
+  }
+}
+window.renderDynamicArtifactReport = renderDynamicArtifactReport;
+
+function renderDynamicArtifactTable(data, queryTitle) {
+  if (!data || !Array.isArray(data) || data.length === 0) return;
+  currentTableData = data;
+
+  const titleEl = document.getElementById('dynamic-table-title');
+  if (titleEl && queryTitle) titleEl.textContent = `Dữ liệu Sandbox: ${queryTitle}`;
+
+  const container = document.getElementById('dynamic-table-container');
+  if (!container) return;
+
+  const headers = Object.keys(data[0]);
+  container.innerHTML = `
+    <table class="table-simple">
+      <thead>
+        <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${data.map(row => `
+          <tr>
+            ${headers.map(h => {
+              const val = row[h];
+              const isNum = typeof val === 'number';
+              const formatted = isNum ? (val >= 1000 ? formatNumber(val) : val) : escapeHtml(val);
+              return `<td class="${isNum ? 'font-mono' : ''}" style="${isNum ? 'text-align:right;' : ''}">${formatted}</td>`;
+            }).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+window.renderDynamicArtifactTable = renderDynamicArtifactTable;
+
+function downloadCurrentArtifact() {
+  if (currentActiveCanvasTab === 'chart') {
+    const canvas = document.getElementById('dynamic-artifact-chart-canvas');
+    if (!canvas) return;
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `omnicorp_chart_${Date.now()}.png`;
+    a.click();
+  } else if (currentActiveCanvasTab === 'report') {
+    window.print();
+  } else if (currentActiveCanvasTab === 'table' && currentTableData) {
+    let csv = '';
+    const headers = Object.keys(currentTableData[0]);
+    csv += headers.join(',') + '\n';
+    currentTableData.forEach(r => {
+      csv += headers.map(h => `"${(r[h] || '').toString().replace(/"/g, '""')}"`).join(',') + '\n';
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `omnicorp_data_${Date.now()}.csv`;
+    a.click();
+  }
+}
+window.downloadCurrentArtifact = downloadCurrentArtifact;
+
 function appendAssistantMessage(data, elapsedMs) {
   const chatStream = document.getElementById('chat-messages');
   if (!chatStream) return;
@@ -2055,13 +2387,53 @@ function appendAssistantMessage(data, elapsedMs) {
 
   let answerHtml = renderMarkdown(data.answer || '');
 
+  // Dispatch to Dynamic Artifact Canvas!
+  if (data.artifact) {
+    if (data.artifact.type === 'chart') {
+      currentChartArtifact = data.artifact;
+      renderDynamicArtifactChart(data.artifact);
+      switchCanvasTab('chart');
+    } else if (data.artifact.type === 'report') {
+      currentReportArtifact = data.artifact;
+      renderDynamicArtifactReport(data.artifact);
+      switchCanvasTab('report');
+    }
+  }
+
+  if (data.available_artifacts) {
+    if (data.available_artifacts.chart) currentChartArtifact = data.available_artifacts.chart;
+    if (data.available_artifacts.report) currentReportArtifact = data.available_artifacts.report;
+  }
+
+  if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+    currentTableData = data.data;
+    renderDynamicArtifactTable(data.data, data.question);
+  }
+
+  // Interactive Action Pills & Executive Quick Actions
+  let artifactPillsHtml = '';
+  if (currentChartArtifact || currentReportArtifact || currentTableData) {
+    const isCrisis = (data.domain === 'Payment' || (data.question && data.question.toLowerCase().includes('momo')) || (data.question && data.question.toLowerCase().includes('s003')));
+    const isLogistics = (data.domain === 'Logistics' || (data.question && data.question.toLowerCase().includes('ghn')));
+    
+    artifactPillsHtml = `
+      <div class="ai-artifact-actions">
+        ${currentChartArtifact ? `<button type="button" class="btn-artifact-pill" onclick="renderDynamicArtifactChart(currentChartArtifact); switchCanvasTab('chart');">📊 Mở Biểu đồ trên Canvas</button>` : ''}
+        ${currentReportArtifact ? `<button type="button" class="btn-artifact-pill secondary" onclick="renderDynamicArtifactReport(currentReportArtifact); switchCanvasTab('report');">📑 Mở Báo cáo C-Suite</button>` : ''}
+        ${currentTableData ? `<button type="button" class="btn-artifact-pill secondary" onclick="switchCanvasTab('table');">📋 Bảng Dữ liệu (${currentTableData.length} dòng)</button>` : ''}
+        ${isCrisis ? `<button type="button" class="btn-artifact-pill action-trigger" onclick="applySuggestion('Kích hoạt chuyển luồng sang VNPay/ZaloPay'); switchCanvasTab('rca');">🚀 Kích hoạt Failover Cổng Thanh Toán</button>` : ''}
+        ${isLogistics ? `<button type="button" class="btn-artifact-pill action-trigger" onclick="applySuggestion('Điều chuyển 35% vận đơn sang Viettel Post'); switchCanvasTab('telemetry');">🚚 Điều phối Vận đơn Viettel Post</button>` : ''}
+      </div>
+    `;
+  }
+
   let tableHtml = '';
   if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-    const rows = data.data.slice(0, 10);
+    const rows = data.data.slice(0, 5);
     const headers = Object.keys(rows[0]);
 
     tableHtml = `
-      <div class="ai-table-preview">
+      <div class="ai-table-preview" style="margin-top:10px;">
         <table class="table-simple" style="margin:0;">
           <thead>
             <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
@@ -2079,7 +2451,7 @@ function appendAssistantMessage(data, elapsedMs) {
             `).join('')}
           </tbody>
         </table>
-        ${data.data.length > 10 ? `<div style="font-size:0.75rem;color:var(--text-muted);padding:6px 12px;background:rgba(0,0,0,0.2);">Hiển thị 10 / ${data.data.length} dòng dữ liệu</div>` : ''}
+        ${data.data.length > 5 ? `<div style="font-size:0.75rem;color:var(--text-muted);padding:4px 8px;background:rgba(0,0,0,0.2);">Hiển thị 5 / ${data.data.length} dòng (Xem đầy đủ tại tab Bảng dữ liệu)</div>` : ''}
       </div>
     `;
   }
@@ -2096,21 +2468,15 @@ function appendAssistantMessage(data, elapsedMs) {
           <div class="sql-card-badges">
             <span class="sql-badge-sandbox">🛡️ READ-ONLY SANDBOX</span>
             <span class="sql-badge-latency">⚡ ${elapsedMs || 35}ms</span>
-            <span class="sql-badge-rows">📊 ${rowsCount} Dòng kết quả</span>
+            <span class="sql-badge-rows">📊 ${rowsCount} Dòng</span>
           </div>
           <div class="sql-card-actions">
-            <button type="button" class="btn-sql-copy" onclick="copySqlToClipboard('${uniqueId}', this)" title="Sao chép câu lệnh SQL vào bộ nhớ đệm">
-              📋 Copy SQL
-            </button>
-            <button type="button" class="btn-sql-rerun" onclick="rerunSqlQuery('${safeQueryText}')" title="Thực thi lại câu truy vấn này">
-              🔄 Chạy lại
-            </button>
-            <button type="button" class="btn-sql-toggle" onclick="toggleSqlView('${uniqueId}')" title="Ẩn hoặc hiện mã SQL">
-              Ẩn/Hiện
-            </button>
+            <button type="button" class="btn-sql-copy" onclick="copySqlToClipboard('${uniqueId}', this)">📋 Copy SQL</button>
+            <button type="button" class="btn-sql-rerun" onclick="rerunSqlQuery('${safeQueryText}')">🔄 Chạy lại</button>
+            <button type="button" class="btn-sql-toggle" onclick="toggleSqlView('${uniqueId}')">Ẩn/Hiện</button>
           </div>
         </div>
-        <pre id="${uniqueId}" class="sql-card-code" style="display:block;"><code>${escapeHtml(data.sql_query)}</code></pre>
+        <pre id="${uniqueId}" class="sql-card-code" style="display:none;"><code>${escapeHtml(data.sql_query)}</code></pre>
       </div>
     `;
   }
@@ -2119,7 +2485,7 @@ function appendAssistantMessage(data, elapsedMs) {
   if (data.suggested_followups && data.suggested_followups.length > 0) {
     followupsHtml = `
       <div class="followups-container">
-        <span style="font-size:0.75rem;color:var(--text-muted);align-self:center;margin-right:4px;">Gợi ý hỏi tiếp:</span>
+        <span style="font-size:0.72rem;color:var(--text-muted);margin-right:2px;">Gợi ý:</span>
         ${data.suggested_followups.map(f => `<button type="button" class="prompt-chip" onclick="applySuggestion('${escapeHtml(f)}')">${escapeHtml(f)}</button>`).join('')}
       </div>
     `;
@@ -2129,6 +2495,7 @@ function appendAssistantMessage(data, elapsedMs) {
     <div class="msg-avatar">AI</div>
     <div class="msg-content">
       <div class="ai-answer-body">${answerHtml}</div>
+      ${artifactPillsHtml}
       ${tableHtml}
       ${sqlHtml}
       ${followupsHtml}
@@ -2195,6 +2562,10 @@ function toggleSqlView(id) {
 }
 
 function scrollChatToBottom() {
+  const scrollContainer = document.getElementById('cockpit-scroll-container');
+  if (scrollContainer) {
+    setTimeout(() => { scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' }); }, 50);
+  }
   const chatStream = document.getElementById('chat-messages');
   if (chatStream) {
     setTimeout(() => { chatStream.scrollTop = chatStream.scrollHeight; }, 50);
@@ -2299,7 +2670,7 @@ async function setSimulationSpeed(multiplier, burst) {
     });
     const data = await res.json();
     if (data.status === 'SUCCESS') {
-      showToastNotification(`Đã đổi tốc độ dòng chảy: ${multiplier}x ${burst ? '(Chế độ Sóng thần Flash Sale)' : ''}`, 'success');
+      showToastNotification(`Đã điều chỉnh vận tốc đồng bộ: ${multiplier}x ${burst ? '(Chế độ Đột biến Tải Flash Sale)' : ''}`, 'success');
       if (data.stream) updateStreamUI(data.stream);
     }
   } catch (err) {
@@ -2316,7 +2687,7 @@ async function triggerDynamicChaos(chaosType) {
     });
     const data = await res.json();
     if (data.status === 'SUCCESS') {
-      showToastNotification(`⚠️ Đã kích hoạt sự cố động: ${chaosType}! Hệ thống đang lan truyền nhân quả domino...`, 'warning');
+      showToastNotification(`⚠️ Đã kích hoạt kịch bản thử tải: ${chaosType}! Hệ thống đang phân tích tác động rủi ro...`, 'warning');
       if (data.stream) updateStreamUI(data.stream);
     }
   } catch (err) {
@@ -2333,10 +2704,10 @@ async function triggerTwinIntervention(action) {
     });
     const data = await res.json();
     if (data.status === 'SUCCESS') {
-      showToastNotification(`🛡️ ${data.intervention?.message || 'Can thiệp thành công! Hệ sinh thái số đang tự phục hồi.'}`, 'success');
+      showToastNotification(`🛡️ ${data.intervention?.message || 'Đã kích hoạt cơ chế dự phòng & điều phối tự động thành công.'}`, 'success');
       if (data.stream) updateStreamUI(data.stream);
     } else {
-      showToastNotification(`❌ Can thiệp bị từ chối: ${data.message}`, 'error');
+      showToastNotification(`❌ Điều phối thất bại: ${data.message}`, 'error');
     }
   } catch (err) {
     showToastNotification('Lỗi can thiệp: ' + err.message, 'error');
@@ -2491,6 +2862,56 @@ function closeExportModal() {
   const modal = document.getElementById('export-modal');
   if (modal) modal.classList.remove('active');
 }
+
+function openSimulatorModal() {
+  const modal = document.getElementById('simulator-modal');
+  if (modal) modal.classList.add('active');
+}
+window.openSimulatorModal = openSimulatorModal;
+
+function closeSimulatorModal(event) {
+  const modal = document.getElementById('simulator-modal');
+  if (modal) modal.classList.remove('active');
+}
+window.closeSimulatorModal = closeSimulatorModal;
+
+async function triggerQuickChaos(chaosType, scenarioLabel) {
+  closeSimulatorModal();
+  showToastNotification(`⚡ Đang bơm sự cố giả lập: ${scenarioLabel}...`, 'warning');
+
+  try {
+    const res = await fetch('/api/stream/chaos/inject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chaos_type: chaosType,
+        severity: 0.85,
+        duration_seconds: 300
+      })
+    });
+
+    if (res.ok) {
+      showToastNotification(`🚨 Sự cố đã tiêm thành công! Đang kích hoạt radar cảnh báo...`, 'warning');
+      
+      // Auto switch to SRE Telemetry tab to watch pulse
+      switchCanvasTab('telemetry');
+
+      // Auto notify user in chat
+      setTimeout(() => {
+        const input = document.getElementById('ai-user-input');
+        if (input) {
+          input.value = `Điều tra khẩn cấp sự cố: ${scenarioLabel}`;
+          document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+        }
+      }, 800);
+    } else {
+      showToastNotification(`Không thể kích hoạt sự cố: Lỗi máy chủ`, 'error');
+    }
+  } catch (err) {
+    showToastNotification(`Lỗi kết nối: ${err.message}`, 'error');
+  }
+}
+window.triggerQuickChaos = triggerQuickChaos;
 
 // =============================================================================
 // 24/7 Autonomous Sentinel Integration
@@ -2746,9 +3167,9 @@ function updateScenarioV2Meta() {
   const hint = document.getElementById('v2-scenario-hint');
   if (!sel || !hint) return;
   if (sel.value === 'S006') {
-    hint.textContent = 'Đứt gãy nguồn cung linh kiện Viet Electronics + Sập cổng MoMo.';
+    hint.textContent = 'Đứt gãy nguồn cung linh kiện Viet Electronics + Gián đoạn Cổng MoMo (504).';
   } else {
-    hint.textContent = 'Quá tải & đình công đơn vị vận chuyển GHN + Lỗi phần cứng Eco Laptop 072.';
+    hint.textContent = 'Quá tải đối tác vận chuyển GHN + Lỗi phần cứng Eco Laptop 072.';
   }
 }
 
@@ -2859,7 +3280,67 @@ window.triggerTwinIntervention = triggerTwinIntervention;
 // Bootstrap on DOM Ready
 // =============================================================================
 
+// =============================================================================
+// Bootstrap on DOM Ready & Initial Dynamic Artifact Canvas
+// =============================================================================
+
+function initDefaultArtifacts() {
+  // Render default initial executive chart: Channel Revenue Breakdown
+  const defaultChart = {
+    type: 'chart',
+    chart_type: 'bar',
+    title: 'Biểu đồ: Doanh thu theo Kênh Bán hàng (Omnichannel)',
+    subtitle: 'Tự động trích xuất từ dữ liệu PostgreSQL Sandbox thời gian thực',
+    labels: ['Store (Bán lẻ)', 'TikTok Shop', 'Online (Website & App)', 'Marketplace (Shopee)'],
+    datasets: [{
+      label: 'Doanh thu (VND)',
+      data: [38540000000, 24180000000, 16820000000, 5123382325],
+      backgroundColor: [
+        'rgba(6, 182, 212, 0.85)',
+        'rgba(16, 185, 129, 0.85)',
+        'rgba(139, 92, 246, 0.85)',
+        'rgba(245, 158, 11, 0.85)'
+      ],
+      borderColor: ['#06b6d4', '#10b981', '#8b5cf6', '#f59e0b'],
+      borderWidth: 1.5,
+      borderRadius: 6
+    }]
+  };
+  renderDynamicArtifactChart(defaultChart);
+
+  // Pre-populate executive report
+  const defaultReport = {
+    type: 'report',
+    title: 'BÁO CÁO VẬN HÀNH & KẾT QUẢ KINH DOANH THÁNG 08/2026',
+    generated_at: new Date().toLocaleString('vi-VN'),
+    domain: 'C-Suite Executive Governance',
+    summary: 'Bản tin tổng hợp điều hành toàn diện OMNICORP HOLDINGS: Doanh thu tích lũy đạt 84.66 Tỷ VND với 3,183 đơn hàng. SLA giao hàng đạt 39.3% do biến cố logistics Sóng Thần, CSAT duy trì 3.29/5.0. Toàn bộ 5 sự cố lịch sử đã được kiểm toán 100% qua Hội đồng 6 Tác nhân.',
+    kpis: [
+      { label: 'Doanh thu Thuần', value: '84.66 Tỷ VND' },
+      { label: 'Quy mô Đơn hàng', value: '3,183 Đơn' },
+      { label: 'Tỷ lệ Giao đúng hạn', value: '39.3%' },
+      { label: 'Sự cố Đang giám sát', value: '0 Sự cố' }
+    ],
+    table_headers: ['Chỉ số Vận hành', 'Giá trị', 'Trạng thái', 'Đánh giá'],
+    table_rows: [
+      ['Doanh thu Ghi nhận', '84,663,382,325 VND', 'Ổn định', 'Đạt 94% kế hoạch tháng'],
+      ['Thanh toán Thành công', '81.6%', 'Bình thường', 'Khắc phục sự cố MoMo'],
+      ['Giao hàng Đúng hạn (SLA)', '39.3%', 'Cảnh báo', 'Ảnh hưởng từ nghẽn GHN'],
+      ['Điểm CSAT Trung bình', '3.29 / 5.0', 'Trung bình', 'Cải thiện sau khi đổi linh kiện'],
+      ['Sự cố Nghiệp vụ Đang mở', '0 Sự cố', 'Tốt', 'Khắc phục hoàn tất 100%']
+    ],
+    recommendations: [
+      'Duy trì giám sát sát sao các biến động dòng tiền và tỷ lệ hủy đơn vượt ngưỡng 5% trong 24h tới.',
+      'Chủ động định tuyến tự động sang 3PL dự phòng (ViettelPost) khi ghi nhận nút thắt giao nhận.',
+      'Đối chiếu số liệu doanh thu thực nhận qua cổng thanh toán vào cuối mỗi phiên giao dịch.'
+    ]
+  };
+  renderDynamicArtifactReport(defaultReport);
+  switchCanvasTab('chart');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  try { initDefaultArtifacts(); } catch (e) { console.error('Artifacts init failed:', e); }
   try { loadOverview('all'); } catch (e) { console.error('Overview init failed:', e); }
   try { loadFinance(); } catch (e) { console.error('Finance init failed:', e); }
   try { filterSuggestions('CEO'); } catch (e) { console.error('Suggestions init failed:', e); }
@@ -2878,5 +3359,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
 
 

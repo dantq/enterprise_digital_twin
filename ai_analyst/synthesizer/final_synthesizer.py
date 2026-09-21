@@ -179,7 +179,113 @@ class FinalSynthesizer:
             for f in sres.get("findings", []):
                 consolidated_evidence.append(f"[{agent_name}] {f}")
 
+        # =====================================================================
+        # TANG BAT LOI THU HAI — Cross-Critic Overrule Mechanism
+        # FinalSynthesizer runs cross-audit between EvidenceCritic & CausalCritic
+        # then overrules any critic whose verdict is found to be a False Positive.
+        # =====================================================================
+        cross_evidence_audit = evidence_critique.get("cross_audit_of_causal", {})
+        cross_causal_audit = causal_critique.get("cross_audit_of_evidence", {})
+
+        overruled_verdicts: List[Dict[str, Any]] = []
+        confirmed_verdicts: List[Dict[str, Any]] = []
+
+        # Process EvidenceCritic's audit of CausalCritic
+        for req in cross_evidence_audit.get("overrule_requests", []):
+            overruled_verdicts.append({
+                "overruled_agent": req.get("target"),
+                "hypothesis_id": req.get("hypothesis_id", "DAG"),
+                "reason": req.get("reason"),
+                "action_taken": req.get("requested_action"),
+                "overruled_by": "EvidenceCritic (via FinalSynthesizer Overrule Authority)",
+            })
+
+        # Process CausalCritic's audit of EvidenceCritic
+        for req in cross_causal_audit.get("overrule_requests", []):
+            overruled_verdicts.append({
+                "overruled_agent": req.get("target"),
+                "hypothesis_id": req.get("hypothesis_id", "EVIDENCE"),
+                "reason": req.get("reason"),
+                "action_taken": req.get("requested_action"),
+                "overruled_by": "CausalCritic (via FinalSynthesizer Overrule Authority)",
+            })
+
+        # If no overrules, both critics endorsed each other
+        if not overruled_verdicts:
+            confirmed_verdicts = [
+                {
+                    "confirmed_agent": "EvidenceCritic",
+                    "cross_endorsed_by": "CausalCritic",
+                    "status": cross_causal_audit.get("overall_verdict", "EVIDENCE_VERDICT_ENDORSED"),
+                },
+                {
+                    "confirmed_agent": "CausalCritic",
+                    "cross_endorsed_by": "EvidenceCritic",
+                    "status": cross_evidence_audit.get("overall_verdict", "CAUSAL_VERDICT_ENDORSED"),
+                },
+            ]
+
+        # Accountability Log — mandatory output, every investigation
+        accountability_log: List[Dict[str, Any]] = []
+
+        # From Evidence Critic catching Specialist errors
+        for crit in evidence_critique.get("critiques", []):
+            if crit.get("verdict") in ("REJECTED", "FLAGGED", "CLASSIFIED_AS_SYMPTOM"):
+                # Find which specialist proposed this hypothesis
+                source_agent = None
+                for ag, res in specialist_results.items():
+                    for h in res.get("hypotheses", []):
+                        if h.get("hypothesis_id") == crit.get("hypothesis_id"):
+                            source_agent = ag
+                            break
+                if source_agent:
+                    accountability_log.append({
+                        "faulty_agent": source_agent,
+                        "error_type": crit["verdict"],
+                        "hypothesis_id": crit.get("hypothesis_id"),
+                        "caught_by": "EvidenceCritic",
+                        "rationale": crit.get("rationale", "")[:120],
+                    })
+
+        # From Cross-Critic catching Critic errors
+        for ov in overruled_verdicts:
+            accountability_log.append({
+                "faulty_agent": ov["overruled_agent"],
+                "error_type": ov["reason"],
+                "hypothesis_id": ov.get("hypothesis_id", "N/A"),
+                "caught_by": ov["overruled_by"],
+                "rationale": ov["action_taken"],
+            })
+
         # Assemble Markdown Executive Summary
+        accountability_rows = ""
+        for row in accountability_log:
+            accountability_rows += (
+                f"| {row['faulty_agent']} | {row['error_type']} | "
+                f"{row.get('hypothesis_id','N/A')} | {row['caught_by']} |\n"
+            )
+
+        cross_audit_section = ""
+        ev_cross = cross_evidence_audit.get("overall_verdict", "N/A")
+        ca_cross = cross_causal_audit.get("overall_verdict", "N/A")
+        if overruled_verdicts:
+            overrule_details = "; ".join(
+                f"{o['overruled_agent']} ({o['reason']})" for o in overruled_verdicts
+            )
+            cross_audit_section = (
+                f"\n## 4b. Tầng Bắt lỗi Thứ Hai (Cross-Critic Overrule Layer)\n"
+                f"* **EvidenceCritic -> CausalCritic**: `{ev_cross}`\n"
+                f"* **CausalCritic -> EvidenceCritic**: `{ca_cross}`\n"
+                f"* **Overrule Actions**: {overrule_details}\n"
+            )
+        else:
+            cross_audit_section = (
+                f"\n## 4b. Tầng Bắt lỗi Thứ Hai (Cross-Critic Mutual Endorsement)\n"
+                f"* **EvidenceCritic -> CausalCritic**: `{ev_cross}` ✅\n"
+                f"* **CausalCritic -> EvidenceCritic**: `{ca_cross}` ✅\n"
+                f"* Hai Critic kiểm tra lẫn nhau và xác nhận kết quả: không có lỗi chéo.\n"
+            )
+
         summary_md = f"""# Báo cáo Phân tích Nguyên nhân Gốc (Root Cause Analysis - RCA)
 **Mã sự cố**: `{incident_id}`
 **Miền nghiệp vụ**: **{domain}**
@@ -204,8 +310,13 @@ class FinalSynthesizer:
 ## 4. Bằng chứng Thực nghiệm & Thẩm định Đối kháng
 * **Evidence Critic Verdict**: Đã xác nhận tính cô lập thống kê và loại trừ lỗi hệ thống.
 * **Causal Critic Verdict**: Đã loại trừ các giả thuyết cạnh tranh và khẳng định dòng chảy nhân quả.
+{cross_audit_section}
+## 5. Bảng Trách nhiệm (Accountability Log — Who Was Wrong & Who Caught It)
+| Tác nhân sai | Loại lỗi | Hypothesis ID | Ai bắt được |
+|---|---|---|---|
+{accountability_rows if accountability_rows else "| Không có lỗi nào được ghi nhận | - | - | - |\n"}
 
-## 5. Đề xuất Hành động Khắc phục (Actionable Recommendations)
+## 6. Đề xuất Hành động Khắc phục (Actionable Recommendations)
 {chr(10).join([f"- {act}" for act in recommended_actions])}
 """
 
@@ -226,6 +337,14 @@ class FinalSynthesizer:
             "recommended_actions": recommended_actions,
             "evidence": consolidated_evidence,
             "executive_summary": summary_md,
+            # === NEW: Cross-Critic & Accountability data ===
+            "cross_critic_audit": {
+                "evidence_audits_causal": cross_evidence_audit,
+                "causal_audits_evidence": cross_causal_audit,
+                "overruled_verdicts": overruled_verdicts,
+                "confirmed_verdicts": confirmed_verdicts,
+            },
+            "accountability_log": accountability_log,
         }
 
     def synthesize_pro_audit(

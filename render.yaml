@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: enterprise-digital-twin
+    env: python
+    region: singapore  # Gần Việt Nam nhất
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn web_app.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: edt-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: edt-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: edt-postgres
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: edt-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: edt-postgres
+          property: password
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+databases:
+  - name: edt-postgres
+    plan: free
+    region: singapore

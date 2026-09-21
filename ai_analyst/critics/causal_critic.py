@@ -196,6 +196,162 @@ class CausalCritic:
             "acyclicity_verified": causal_graph.get("is_acyclic", False),
         }
 
+    def critique_evidence_verdict(
+        self,
+        evidence_verdict: Dict[str, Any],
+        specialist_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """TANG BAT LOI THU HAI: CausalCritic audits EvidenceCritic's output.
+
+        Checks:
+        1. EvidenceCritic approved a hypothesis with reversed causality
+           (effect before cause in the evidence data timeline).
+        2. EvidenceCritic rejected a hypothesis using correlation data alone,
+           without verifying causal precedence.
+        3. EvidenceCritic produced a False Positive (flagging a valid hypothesis
+           with a statistically weak rationale).
+
+        Returns cross_audit verdicts + any overrule_requests for FinalSynthesizer.
+        """
+        cross_audit_findings: List[Dict[str, Any]] = []
+        overrule_requests: List[Dict[str, Any]] = []
+
+        critiques = evidence_verdict.get("critiques", [])
+
+        # --- Check 1: Any APPROVED hypothesis that has temporal reversal indicators? ---
+        # Temporal reversal: a symptom-cause (e.g. "SupportSpike") was APPROVED as root cause
+        symptom_pseudo_causes = {
+            "PaymentSupportSpike", "StockoutComplaintSpike",
+            "DeliveryComplaintSpike", "WarehouseStockoutImpact",
+            "QualityComplaintsSpike",
+        }
+        # Map hypothesis_id -> root_cause from specialist results
+        hyp_cause_map: Dict[str, str] = {}
+        for _, res in specialist_results.items():
+            for h in res.get("hypotheses", []):
+                hid = h.get("hypothesis_id")
+                rc = h.get("primary_root_cause", "")
+                if hid:
+                    hyp_cause_map[hid] = rc
+
+        false_positive_approvals = []
+        for crit in critiques:
+            hid = crit.get("hypothesis_id")
+            verdict = crit.get("verdict")
+            rc = hyp_cause_map.get(hid, "")
+            if verdict == "APPROVED" and rc in symptom_pseudo_causes:
+                false_positive_approvals.append({
+                    "hypothesis_id": hid,
+                    "approved_cause": rc,
+                    "causal_flaw": "SYMPTOM_APPROVED_AS_ROOT_CAUSE",
+                })
+
+        if false_positive_approvals:
+            cross_audit_findings.append({
+                "check": "FALSE_POSITIVE_APPROVAL_OF_SYMPTOM",
+                "verdict": "FLAGGED",
+                "detail": (
+                    f"EvidenceCritic đã APPROVED {len(false_positive_approvals)} hypothesis "
+                    f"mà thực chất là triệu chứng vận hành: {false_positive_approvals}. "
+                    f"Theo kiểm định thời gian, các node này xảy ra SAU nguyên nhân gốc, "
+                    f"không thể là Root Cause. EvidenceCritic phạm lỗi False Positive."
+                ),
+                "severity": "CRITICAL",
+                "false_positive_cases": false_positive_approvals,
+            })
+            for fp in false_positive_approvals:
+                overrule_requests.append({
+                    "target": "EvidenceCritic",
+                    "hypothesis_id": fp["hypothesis_id"],
+                    "reason": "FALSE_POSITIVE_APPROVED_SYMPTOM_AS_CAUSE",
+                    "requested_action": "RECLASSIFY_AS_CLASSIFIED_AS_SYMPTOM",
+                })
+        else:
+            cross_audit_findings.append({
+                "check": "FALSE_POSITIVE_APPROVAL_OF_SYMPTOM",
+                "verdict": "PASSED",
+                "detail": (
+                    "EvidenceCritic không có trường hợp nào APPROVE nhầm triệu chứng vận hành "
+                    "thành root cause. Không có False Positive được phát hiện."
+                ),
+                "severity": "NONE",
+            })
+
+        # --- Check 2: Any REJECTED hypothesis that had temporally valid precedence? ---
+        rejected_hyps = [c for c in critiques if c.get("verdict") == "REJECTED"]
+        for crit in rejected_hyps:
+            hid = crit.get("hypothesis_id")
+            rationale = crit.get("rationale", "")
+            # Heuristic: if rationale mentions sample-size only but the hypothesis
+            # has a clear temporal structure, it may be a false negative.
+            if "Chưa đủ" in rationale and hid in hyp_cause_map:
+                rc = hyp_cause_map[hid]
+                if rc not in symptom_pseudo_causes:
+                    cross_audit_findings.append({
+                        "check": "POTENTIAL_FALSE_NEGATIVE_REJECTION",
+                        "verdict": "FLAGGED",
+                        "detail": (
+                            f"EvidenceCritic REJECTED hypothesis '{hid}' (cause: '{rc}') "
+                            f"với lý do 'Chưa đủ bằng chứng'. CausalCritic phát hiện: "
+                            f"hypothesis này có trật tự thời gian hợp lệ và không phải triệu chứng. "
+                            f"Cần xem lại ngưỡng thống kê của EvidenceCritic."
+                        ),
+                        "severity": "MEDIUM",
+                    })
+
+        if not any(f["check"] == "POTENTIAL_FALSE_NEGATIVE_REJECTION" for f in cross_audit_findings):
+            cross_audit_findings.append({
+                "check": "POTENTIAL_FALSE_NEGATIVE_REJECTION",
+                "verdict": "PASSED",
+                "detail": "Không phát hiện trường hợp REJECT nhầm hypothesis có giá trị nhân quả.",
+                "severity": "NONE",
+            })
+
+        # --- Check 3: Correlation-only approval (EvidenceCritic approved based on co-occurrence, not cause) ---
+        correlation_only_approvals = [
+            c for c in critiques
+            if c.get("verdict") == "APPROVED"
+            and "tương quan" in c.get("rationale", "").lower()
+            and "nhân quả" not in c.get("rationale", "").lower()
+        ]
+        if correlation_only_approvals:
+            cross_audit_findings.append({
+                "check": "CORRELATION_ONLY_APPROVAL",
+                "verdict": "FLAGGED",
+                "detail": (
+                    f"EvidenceCritic APPROVED {len(correlation_only_approvals)} hypothesis "
+                    f"dựa trên tương quan thống kê mà không kiểm tra quan hệ nhân quả thời gian. "
+                    f"Tương quan ≠ Nhân quả — đây là lỗi Spurious Correlation cổ điển."
+                ),
+                "severity": "HIGH",
+            })
+        else:
+            cross_audit_findings.append({
+                "check": "CORRELATION_ONLY_APPROVAL",
+                "verdict": "PASSED",
+                "detail": "EvidenceCritic không phạm lỗi tương quan giả (Spurious Correlation).",
+                "severity": "NONE",
+            })
+
+        flagged_count = sum(1 for f in cross_audit_findings if f["verdict"] == "FLAGGED")
+        critical_count = sum(1 for f in cross_audit_findings if f.get("severity") == "CRITICAL")
+
+        return {
+            "cross_auditor": self.name,
+            "target_audited": "EvidenceCritic",
+            "audit_type": "SECOND_ERROR_CATCHING_LAYER",
+            "total_checks": len(cross_audit_findings),
+            "flagged_count": flagged_count,
+            "critical_count": critical_count,
+            "overall_verdict": (
+                "OVERRULE_REQUESTED" if critical_count > 0
+                else "FLAGGED_FOR_REVIEW" if flagged_count > 0
+                else "EVIDENCE_VERDICT_ENDORSED"
+            ),
+            "findings": cross_audit_findings,
+            "overrule_requests": overrule_requests,
+        }
+
     def critique_pro_audit(self, pro_results: Dict[str, Any]) -> Dict[str, Any]:
         """Audits temporal precedence and verifies DAG acyclicity on PRO Specialists' causal chains."""
         captured_errors = []

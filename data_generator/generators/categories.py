@@ -1,4 +1,4 @@
-﻿import random
+import random
 from datetime import date
 
 from db import get_connection

@@ -59,7 +59,7 @@ class MultiAgentOrchestrator:
             "CustomerExperienceAnalyst": self.cx_analyst.investigate(observation, effective_cutoff),
         }
 
-        # 2. Adversarial Critique Phase (2 Agents)
+        # 2. Adversarial Critique Phase — Layer 1 (2 Agents critique Specialists)
         evidence_verdict = self.evidence_critic.critique(
             specialist_results,
             observation,
@@ -71,7 +71,23 @@ class MultiAgentOrchestrator:
             observation,
         )
 
-        # 3. Final Synthesis Phase (1 Judge Agent)
+        # 3. TANG BAT LOI THU HAI — Cross-Critic Audit Layer
+        # EvidenceCritic audits CausalCritic's DAG for evidence-based flaws
+        cross_audit_of_causal = self.evidence_critic.critique_causal_verdict(
+            causal_verdict,
+            specialist_results,
+        )
+        # CausalCritic audits EvidenceCritic's verdicts for causal logic flaws
+        cross_audit_of_evidence = self.causal_critic.critique_evidence_verdict(
+            evidence_verdict,
+            specialist_results,
+        )
+
+        # Inject cross-audit results so FinalSynthesizer can apply Overrule Mechanism
+        evidence_verdict["cross_audit_of_causal"] = cross_audit_of_causal
+        causal_verdict["cross_audit_of_evidence"] = cross_audit_of_evidence
+
+        # 4. Final Synthesis Phase (1 Judge Agent — applies Overrule + Accountability Log)
         rca_report = self.synthesizer.synthesize(
             observation,
             specialist_results,
@@ -80,7 +96,7 @@ class MultiAgentOrchestrator:
             window_end=observation.get("end_time"),
         )
 
-        # 4. Benchmark Scoring Phase (Restricted Ground Truth Evaluator)
+        # 5. Benchmark Scoring Phase (Restricted Ground Truth Evaluator)
         scorecard = None
         if evaluate_benchmark:
             scorecard = self.evaluator.evaluate_rca(rca_report)
@@ -92,9 +108,14 @@ class MultiAgentOrchestrator:
             "specialist_results": specialist_results,
             "evidence_critique": evidence_verdict,
             "causal_critique": causal_verdict,
+            "cross_critic_audit": {
+                "evidence_audits_causal": cross_audit_of_causal,
+                "causal_audits_evidence": cross_audit_of_evidence,
+            },
             "rca_report": rca_report,
             "benchmark_scorecard": scorecard,
         }
+
 
     def run_all_active_investigations(self, evaluate_benchmark: bool = True) -> List[Dict[str, Any]]:
         """Discovers all open surface incidents and runs full multi-agent investigations."""

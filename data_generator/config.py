@@ -1,4 +1,4 @@
-﻿# Enterprise Digital Twin
+# Enterprise Digital Twin
 # Data Generator Configuration
 
 # PostgreSQL

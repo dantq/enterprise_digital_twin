@@ -35,6 +35,15 @@ dist/
 # Scratch / temporary
 scratch/
 
+# Database backups — NEVER commit ground truth data
+*.sql
+*.dump
+*.backup
+pg_dump_*
+
+# Generated RCA reports (contain sensitive business data)
+reports/
+
 # OS
 .DS_Store
-Thumbs.db
+Thumbs.db

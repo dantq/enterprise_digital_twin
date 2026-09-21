@@ -18,7 +18,7 @@ def test_serve_index_html():
     """Verify that GET / returns the frontend HTML page."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "Enterprise Digital Twin" in response.text
+    assert ("OmniCorp" in response.text or "Enterprise Digital Twin" in response.text)
     assert "app.js" in response.text
     assert "style.css" in response.text
 

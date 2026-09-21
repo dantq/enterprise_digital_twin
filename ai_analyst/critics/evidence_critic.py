@@ -335,6 +335,133 @@ class EvidenceCritic:
             "approved_insights": approved_insights,
         }
 
+    def critique_causal_verdict(
+        self,
+        causal_verdict: Dict[str, Any],
+        specialist_results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """TANG BAT LOI THU HAI: EvidenceCritic audits CausalCritic's output.
+
+        Checks:
+        1. CausalCritic built the DAG on unverified hypotheses (not APPROVED by EvidenceCritic).
+        2. CausalCritic's DAG contains nodes unsupported by actual data evidence.
+        3. CausalCritic missed a symptom-as-cause fallacy that evidence data can disprove.
+
+        Returns cross_audit verdicts + any overrule_requests for FinalSynthesizer.
+        """
+        cross_audit_findings: List[Dict[str, Any]] = []
+        overrule_requests: List[Dict[str, Any]] = []
+
+        causal_graph = causal_verdict.get("causal_graph", {})
+        dag_nodes = causal_graph.get("nodes", [])
+        primary_root_cause = causal_graph.get("primary_root_cause", "")
+
+        # --- Check 1: Does the DAG's primary_root_cause appear in ANY specialist hypothesis? ---
+        all_hypothesised_causes = set()
+        for _, res in specialist_results.items():
+            for h in res.get("hypotheses", []):
+                rc = h.get("primary_root_cause")
+                if rc:
+                    all_hypothesised_causes.add(rc)
+
+        if primary_root_cause and primary_root_cause not in all_hypothesised_causes:
+            cross_audit_findings.append({
+                "check": "DAG_ROOT_NOT_IN_SPECIALIST_HYPOTHESES",
+                "verdict": "FLAGGED",
+                "detail": (
+                    f"CausalCritic xác định root cause '{primary_root_cause}' nhưng không có "
+                    f"Domain Specialist nào đề xuất hypothesis này. DAG được dựng trên cơ sở ngoại suy, "
+                    f"không có bằng chứng thực nghiệm từ dữ liệu vận hành."
+                ),
+                "severity": "HIGH",
+            })
+            overrule_requests.append({
+                "target": "CausalCritic",
+                "reason": "PRIMARY_ROOT_CAUSE_UNSUPPORTED_BY_EVIDENCE",
+                "requested_action": "REJECT_DAG_AND_REBUILD",
+            })
+        else:
+            cross_audit_findings.append({
+                "check": "DAG_ROOT_NOT_IN_SPECIALIST_HYPOTHESES",
+                "verdict": "PASSED",
+                "detail": f"Root cause '{primary_root_cause}' khớp với hypothesis của ít nhất 1 Domain Specialist.",
+                "severity": "NONE",
+            })
+
+        # --- Check 2: Are there symptom-nodes in the DAG that evidence data contradicts? ---
+        symptom_nodes = {
+            "PaymentSupportSpike", "StockoutComplaintSpike",
+            "DeliveryComplaintSpike", "WarehouseStockoutImpact",
+            "QualityComplaintsSpike",
+        }
+        dag_symptom_as_cause = [n for n in dag_nodes[:2] if n in symptom_nodes]
+        if dag_symptom_as_cause:
+            cross_audit_findings.append({
+                "check": "SYMPTOM_PLACED_AS_CAUSE_IN_DAG",
+                "verdict": "FLAGGED",
+                "detail": (
+                    f"CausalCritic đặt node '{dag_symptom_as_cause}' ở đầu DAG như một nguyên nhân. "
+                    f"Theo phân loại của EvidenceCritic, đây là các triệu chứng vận hành (Operational Symptoms), "
+                    f"không phải nguyên nhân gốc. Điều này vi phạm nguyên tắc Cause-Before-Effect."
+                ),
+                "severity": "CRITICAL",
+            })
+            overrule_requests.append({
+                "target": "CausalCritic",
+                "reason": "SYMPTOM_MISCLASSIFIED_AS_ROOT_CAUSE_IN_DAG",
+                "requested_action": "MOVE_SYMPTOM_NODES_TO_MECHANISM_LAYER",
+            })
+        else:
+            cross_audit_findings.append({
+                "check": "SYMPTOM_PLACED_AS_CAUSE_IN_DAG",
+                "verdict": "PASSED",
+                "detail": "Không phát hiện symptom node nào bị đặt nhầm vào vị trí root cause trong DAG.",
+                "severity": "NONE",
+            })
+
+        # --- Check 3: Does the temporal_check rely on no evidence at all? ---
+        temporal_checks = causal_verdict.get("temporal_checks", [])
+        unsupported_temporal = [
+            tc for tc in temporal_checks
+            if tc.get("valid") and not tc.get("notes")
+        ]
+        if unsupported_temporal:
+            cross_audit_findings.append({
+                "check": "TEMPORAL_CHECK_WITHOUT_EVIDENCE",
+                "verdict": "FLAGGED",
+                "detail": (
+                    f"CausalCritic có {len(unsupported_temporal)} temporal check được đánh dấu VALID "
+                    f"nhưng không có notes giải thích bằng chứng. Không thể xác minh tính hợp lệ của trật tự thời gian."
+                ),
+                "severity": "MEDIUM",
+            })
+        else:
+            cross_audit_findings.append({
+                "check": "TEMPORAL_CHECK_WITHOUT_EVIDENCE",
+                "verdict": "PASSED",
+                "detail": "Tất cả temporal checks đều có giải thích bằng chứng kèm theo.",
+                "severity": "NONE",
+            })
+
+        flagged_count = sum(1 for f in cross_audit_findings if f["verdict"] == "FLAGGED")
+        critical_count = sum(1 for f in cross_audit_findings if f.get("severity") == "CRITICAL")
+
+        return {
+            "cross_auditor": self.name,
+            "target_audited": "CausalCritic",
+            "audit_type": "SECOND_ERROR_CATCHING_LAYER",
+            "total_checks": len(cross_audit_findings),
+            "flagged_count": flagged_count,
+            "critical_count": critical_count,
+            "overall_verdict": (
+                "OVERRULE_REQUESTED" if critical_count > 0
+                else "FLAGGED_FOR_REVIEW" if flagged_count > 0
+                else "CAUSAL_VERDICT_ENDORSED"
+            ),
+            "findings": cross_audit_findings,
+            "overrule_requests": overrule_requests,
+        }
+
     def audit_noise_and_sample_size(
         self,
         sample_count: int,
