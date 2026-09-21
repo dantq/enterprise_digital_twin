@@ -12,9 +12,24 @@ DB_USER = os.environ.get("DB_USER", "postgres")
 
 _db_password = os.environ.get("PGPASSWORD") or os.environ.get("DB_PASSWORD")
 if _db_password is None:
-    # Fallback for local development only — remove before deploying to production
+    # Fallback for local development only
     _db_password = "Dantq24@#@#"
 DB_PASSWORD = _db_password
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    from urllib.parse import urlparse
+    _url = urlparse(DATABASE_URL)
+    if _url.hostname:
+        DB_HOST = _url.hostname
+    if _url.port:
+        DB_PORT = _url.port
+    if _url.path and len(_url.path) > 1:
+        DB_NAME = _url.path.lstrip("/")
+    if _url.username:
+        DB_USER = _url.username
+    if _url.password:
+        DB_PASSWORD = _url.password
 
 # Database Security Roles
 # Agents ALWAYS query under this restricted role
