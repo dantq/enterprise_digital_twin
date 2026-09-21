@@ -286,6 +286,13 @@ class FinalSynthesizer:
                 f"* Hai Critic kiểm tra lẫn nhau và xác nhận kết quả: không có lỗi chéo.\n"
             )
 
+        accountability_block = (
+            accountability_rows
+            if accountability_rows
+            else "| Không có lỗi nào được ghi nhận | - | - | - |\n"
+        )
+        actions_block = "\n".join([f"- {act}" for act in recommended_actions])
+
         summary_md = f"""# Báo cáo Phân tích Nguyên nhân Gốc (Root Cause Analysis - RCA)
 **Mã sự cố**: `{incident_id}`
 **Miền nghiệp vụ**: **{domain}**
@@ -314,10 +321,10 @@ class FinalSynthesizer:
 ## 5. Bảng Trách nhiệm (Accountability Log — Who Was Wrong & Who Caught It)
 | Tác nhân sai | Loại lỗi | Hypothesis ID | Ai bắt được |
 |---|---|---|---|
-{accountability_rows if accountability_rows else "| Không có lỗi nào được ghi nhận | - | - | - |\n"}
+{accountability_block}
 
 ## 6. Đề xuất Hành động Khắc phục (Actionable Recommendations)
-{chr(10).join([f"- {act}" for act in recommended_actions])}
+{actions_block}
 """
 
         return {
