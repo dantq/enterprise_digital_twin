@@ -762,130 +762,126 @@ class NLQueryEngine:
                 target_year = int(year_match.group(1))
             return self._handle_monthly_comparison_query(clean_q, q_lower, all_months[0], all_months[1], target_year)
 
-        # 0b1. Universal Orders Engine (Handles: lớn nhất, nhỏ nhất, mới nhất, cũ nhất, hôm nay, tuần này, tháng này, năm nay, kênh, chi nhánh, tổng số đơn...)
-        if any(k in q_lower for k in [
-            "đơn hàng", "don hang", "đơn mới", "đơn lớn", "đơn nhỏ", "đơn gần", "đơn vừa",
-            "mới nhất là gì", "mới nhất", "gần nhất", "giá trị nhất", "lớn nhất", "nhỏ nhất",
-            "cao nhất", "thấp nhất", "đắt nhất", "rẻ nhất", "bao nhiêu đơn", "bao nhiêu đơn bị hủy",
-            "đơn bị hủy", "đơn huỷ", "số đơn hôm nay", "mấy đơn", "order", "orders"
-        ]) and not any(k in q_lower for k in ["sản phẩm", "doanh thu", "chiến dịch", "tiktok", "facebook", "nhân viên", "p&l", "lãi hay lỗ"]):
-            return self._handle_universal_orders_query(clean_q, q_lower)
-
-        # 0b2. Universal Revenue Engine (Handles: doanh thu hôm nay, tuần này, tháng này, năm nay, theo kênh, theo chi nhánh...)
-        if any(k in q_lower for k in [
-            "doanh thu", "doanh số", "revenue", "tiền thu"
-        ]) and not any(k in q_lower for k in ["sản phẩm", "nhân viên", "chiến dịch", "p&l", "lãi hay lỗ"]):
-            return self._handle_universal_revenue_query(clean_q, q_lower)
-
-        # 0e. Employee Performance & Sales Representatives ("nhân viên", "ai bán nhiều nhất")
-        if any(k in q_lower for k in ["nhân viên", "nhan vien", "sales rep", "ai bán được nhiều nhất", "doanh thu theo nhân viên", "doanh số nhân viên", "hiệu suất nhân viên"]):
-            return self._handle_employee_performance_query(clean_q, q_lower)
-
-        # 0f. Customer Growth & Returning Customers ("khách hàng mới hôm nay", "khách hàng quay lại")
-        if any(k in q_lower for k in ["khách hàng mới", "khách mới", "khách hàng quay lại", "khách quay lại", "retention", "mua lại", "quay lại mua"]):
-            return self._handle_customer_retention_query(clean_q, q_lower)
-
-        # 0g. Inventory Stockout & Safety Stock ("sản phẩm tồn kho", "sắp hết hàng")
-        if any(k in q_lower for k in ["sắp hết hàng", "hết hàng tồn", "dưới định mức", "tồn kho an toàn", "nguy cơ hết hàng", "cảnh báo hết kho", "sản phẩm tồn kho", "thống kê tồn kho"]):
-            return self._handle_inventory_stockout_query(clean_q, q_lower)
-
-        # 0h. Branch / Retail Store Revenue ("doanh thu theo chi nhánh", "cửa hàng")
-        if any(k in q_lower for k in ["chi nhánh", "doanh thu chi nhánh", "doanh thu theo chi nhánh", "chi nhanh", "cửa hàng"]):
-            return self._handle_branch_revenue_query(clean_q, q_lower)
-
-        # 0i. Digital Interventions & Crisis Recovery ROI ("can thiệp số", "phục hồi bao nhiêu")
-        if any(k in q_lower for k in ["can thiệp", "can thiep", "phục hồi", "phuc hoi", "khôi phục", "what if", "mô phỏng can thiệp"]):
-            return self._handle_digital_interventions_roi_query(clean_q, q_lower)
-
         # 1. Specific Incident S003 MoMo (Operational Monitoring)
-        elif "momo" in q_lower:
+        if "momo" in q_lower:
             return self._handle_momo_query(clean_q, q_lower)
 
-        # 2. 5 Crisis Incidents Breakdown (S001 - S005)
-        elif any(k in q_lower for k in [
+        # 2. 5 Crisis Incidents Breakdown (S001 - S005) & Root Cause Analysis
+        if any(k in q_lower for k in [
             "5 sự cố", "năm sự cố", "thiệt hại tài chính", "xói mòn", "khủng hoảng", 
-            "tổn thất", "s001", "s002", "s003", "s004", "s005", "nguyên nhân gốc", "rca", "giải trình"
+            "tổn thất", "s001", "s002", "s003", "s004", "s005", "nguyên nhân gốc", "rca", "giải trình", "sự cố"
         ]):
             return self._handle_incident_breakdown_query(clean_q, q_lower)
 
-        # 3. Payment Methods & Gateway Distribution
-        elif any(k in q_lower for k in ["phương thức thanh toán", "payment method", "thanh toán bằng", "cổng thanh toán"]):
-            return self._handle_payment_methods_query(clean_q, q_lower)
+        # 3. Defective Quality & Hardware Bottleneck (S005 / Eco Laptop)
+        if any(k in q_lower for k in ["chất lượng", "lỗi", "eco laptop", "hỏng", "pin", "đổi trả"]):
+            return self._handle_quality_query(clean_q, q_lower)
 
-        # 4. High Value Orders (> 50M / 100M VND)
-        elif any(k in q_lower for k in ["giá trị cao", "đơn hàng lớn", "50 triệu", "100 triệu", "đơn hàng trên"]):
-            return self._handle_high_value_orders_query(clean_q, q_lower)
+        # 4. Supply Chain & Suppliers (S001 / Viet Electronics)
+        if any(k in q_lower for k in ["nhà cung cấp", "supplier", "viet electronics", "po", "purchase order"]):
+            return self._handle_supply_query(clean_q, q_lower)
 
-        # 5. Customer Reviews, 1-Star & Quality Complaints (Takes precedence over general customer)
-        elif any(k in q_lower for k in ["bồi hoàn", "hoàn tiền", "refund", "1 sao", "sao thấp", "đánh giá", "review", "khiếu nại", "ticket", "cskh"]):
-            return self._handle_customer_feedback_query(clean_q, q_lower)
+        # 5. Logistics & Carrier SLA (S002 / GHN Depot Congestion)
+        if any(k in q_lower for k in ["vận chuyển", "giao hàng", "carrier", "ghn", "viettel post", "ghtk", "trễ hạn", "delivery", "shipment", "bưu cục"]):
+            return self._handle_logistics_query(clean_q, q_lower)
 
-        # 6. Omnichannel sales breakdown
-        elif any(k in q_lower for k in ["kênh", "channel", "cơ cấu doanh thu", "đa kênh"]):
-            return self._handle_channel_query(clean_q, q_lower)
+        # 6. Marketing & Campaigns (S004 / TikTok Inefficiency)
+        if any(k in q_lower for k in ["marketing", "quảng cáo", "tiktok", "facebook", "chiến dịch", "cac", "cvr", "chuyển đổi", "lãng phí", "campaign"]):
+            return self._handle_marketing_query(clean_q, q_lower)
 
-        # 7. Warehouses & stock levels
-        elif any(k in q_lower for k in ["kho", "warehouse", "bao nhiêu kho", "tồn kho"]):
-            return self._handle_warehouse_query(clean_q, q_lower)
-
-        # 8. Profitability assessment ("có lợi nhuận không", "lãi hay lỗ")
-        elif any(k in q_lower for k in ["có lợi nhuận không", "lãi hay lỗ", "lợi nhuận âm", "có lãi không", "lỗ bao nhiêu"]):
-            return self._handle_profitability_assessment_query(clean_q, q_lower)
-
-        # 9. Customer Demographics & Top VIP Buyers
-        elif any(k in q_lower for k in ["khách hàng", "customer", "ai mua nhiều nhất", "vip", "thành phố", "tỉnh", "phân khúc"]):
-            return self._handle_customer_analytics_query(clean_q, q_lower)
-
-        # 10. Order Cancellations & Root Reasons
-        elif any(k in q_lower for k in ["hủy đơn", "đơn bị hủy", "lý do hủy", "cancelled"]):
+        # 7. Order Cancellations & Root Reasons
+        if any(k in q_lower for k in ["hủy đơn", "đơn bị hủy", "lý do hủy", "cancelled"]):
             return self._handle_cancellation_analysis_query(clean_q, q_lower)
 
-        # 11. Cash Flow Statement
-        elif any(k in q_lower for k in ["dòng tiền", "cash flow", "lưu chuyển tiền"]):
+        # 8. Customer Reviews, 1-Star & Quality Complaints
+        if any(k in q_lower for k in ["bồi hoàn", "hoàn tiền", "refund", "1 sao", "sao thấp", "đánh giá", "review", "khiếu nại", "ticket", "cskh"]):
+            return self._handle_customer_feedback_query(clean_q, q_lower)
+
+        # 9. Payment Methods & Gateway Distribution
+        if any(k in q_lower for k in ["phương thức thanh toán", "payment method", "thanh toán bằng", "cod", "chuyển khoản", "tiền mặt", "ví điện tử", "cổng thanh toán"]):
+            return self._handle_payment_methods_query(clean_q, q_lower)
+
+        # 10. Omnichannel sales breakdown
+        if any(k in q_lower for k in ["kênh", "channel", "cơ cấu doanh thu", "đa kênh", "omnichannel"]):
+            return self._handle_channel_query(clean_q, q_lower)
+
+        # 11. Warehouses & stock levels
+        if any(k in q_lower for k in ["kho", "warehouse", "bao nhiêu kho", "tồn kho"]):
+            return self._handle_warehouse_query(clean_q, q_lower)
+
+        # 12. Profitability assessment ("có lợi nhuận không", "lãi hay lỗ")
+        if any(k in q_lower for k in ["có lợi nhuận không", "lãi hay lỗ", "lợi nhuận âm", "có lãi không", "lỗ bao nhiêu"]):
+            return self._handle_profitability_assessment_query(clean_q, q_lower)
+
+        # 13. Customer Demographics & Top VIP Buyers
+        if any(k in q_lower for k in ["khách hàng", "customer", "ai mua nhiều nhất", "vip", "thành phố", "tỉnh", "phân khúc"]):
+            return self._handle_customer_analytics_query(clean_q, q_lower)
+
+        # 14. Customer Growth & Returning Customers ("khách hàng mới", "khách hàng quay lại")
+        if any(k in q_lower for k in ["khách hàng mới", "khách mới", "khách hàng quay lại", "khách quay lại", "retention", "mua lại", "quay lại mua"]):
+            return self._handle_customer_retention_query(clean_q, q_lower)
+
+        # 15. Cash Flow Statement
+        if any(k in q_lower for k in ["dòng tiền", "cash flow", "lưu chuyển tiền"]):
             return self._handle_cashflow_query(clean_q, q_lower)
 
-        # 12. Category Margins
-        elif any(k in q_lower for k in ["ngành hàng", "danh mục", "biên lợi nhuận gộp", "category"]):
+        # 16. Category Margins
+        if any(k in q_lower for k in ["ngành hàng", "danh mục", "biên lợi nhuận gộp", "category"]):
             return self._handle_category_margin_query(clean_q, q_lower)
 
-        # 12b. Total Products Sold Volume ("tổng bao nhiêu sản phẩm", "bao nhiêu sản phẩm bán ra", "số lượng bán")
-        elif any(k in q_lower for k in [
+        # 17. Total Products Sold Volume
+        if any(k in q_lower for k in [
             "tổng bao nhiêu sản phẩm", "bao nhiêu sản phẩm", "bao nhiêu sp",
             "tổng số lượng sản phẩm", "tổng sản phẩm bán", "số lượng sản phẩm bán",
             "được bán ra", "đc bán ra", "đã bán bao nhiêu", "bán ra bao nhiêu"
         ]):
             return self._handle_total_products_sold_query(clean_q, q_lower)
 
-        # 13. Top Products / Best Sellers / Standalone "top 10" / "top 5" / "top 20"
-        elif any(k in q_lower for k in [
+        # 18. Inventory Stockout & Safety Stock
+        if any(k in q_lower for k in ["sắp hết hàng", "hết hàng tồn", "dưới định mức", "tồn kho an toàn", "nguy cơ hết hàng", "cảnh báo hết kho", "sản phẩm tồn kho", "thống kê tồn kho"]):
+            return self._handle_inventory_stockout_query(clean_q, q_lower)
+
+        # 19. Branch / Retail Store Revenue
+        if any(k in q_lower for k in ["chi nhánh", "doanh thu chi nhánh", "doanh thu theo chi nhánh", "chi nhanh", "cửa hàng"]):
+            return self._handle_branch_revenue_query(clean_q, q_lower)
+
+        # 20. Employee Performance & Sales Representatives
+        if any(k in q_lower for k in ["nhân viên", "nhan vien", "sales rep", "ai bán được nhiều nhất", "doanh thu theo nhân viên", "doanh số nhân viên", "hiệu suất nhân viên"]):
+            return self._handle_employee_performance_query(clean_q, q_lower)
+
+        # 21. Digital Interventions & Crisis Recovery ROI
+        if any(k in q_lower for k in ["can thiệp", "can thiep", "phục hồi", "phuc hoi", "khôi phục", "what if", "mô phỏng can thiệp"]):
+            return self._handle_digital_interventions_roi_query(clean_q, q_lower)
+
+        # 22. Top Products / Best Sellers
+        if any(k in q_lower for k in [
             "sản phẩm", "bán chạy", "bán được nhiều nhất", "top sản phẩm",
             "top 5", "top 10", "top 20", "top 15"
         ]) or q_lower.strip() in ("top 10", "top 5", "top 20", "top 15", "top") or q_lower.startswith("top "):
             return self._handle_orders_query(clean_q, q_lower)
 
-        # 14. Logistics & Carrier SLA
-        elif any(k in q_lower for k in ["vận chuyển", "giao hàng", "carrier", "ghn", "viettel post", "ghtk", "trễ hạn", "delivery", "shipment"]):
-            return self._handle_logistics_query(clean_q, q_lower)
+        # 23. High Value Orders (> 50M / 100M VND)
+        if any(k in q_lower for k in ["giá trị cao", "đơn hàng lớn", "50 triệu", "100 triệu", "đơn hàng trên"]):
+            return self._handle_high_value_orders_query(clean_q, q_lower)
 
-        # 15. Marketing & Campaigns
-        elif any(k in q_lower for k in ["marketing", "quảng cáo", "tiktok", "facebook", "chiến dịch", "cac", "cvr", "chuyển đổi", "lãng phí", "campaign"]):
-            return self._handle_marketing_query(clean_q, q_lower)
+        # 24. Universal Orders Engine (Fallback for general order questions)
+        if any(k in q_lower for k in [
+            "đơn hàng", "don hang", "đơn mới", "đơn lớn", "đơn nhỏ", "đơn gần", "đơn vừa",
+            "mới nhất là gì", "mới nhất", "gần nhất", "giá trị nhất", "lớn nhất", "nhỏ nhất",
+            "cao nhất", "thấp nhất", "đắt nhất", "rẻ nhất", "bao nhiêu đơn", "order", "orders"
+        ]):
+            return self._handle_universal_orders_query(clean_q, q_lower)
 
-        # 16. Supply Chain & Suppliers
-        elif any(k in q_lower for k in ["nhà cung cấp", "supplier", "viet electronics", "po", "purchase order"]):
-            return self._handle_supply_query(clean_q, q_lower)
+        # 25. Universal Revenue Engine (Fallback for general revenue questions)
+        if any(k in q_lower for k in ["doanh thu", "doanh số", "revenue", "tiền thu"]):
+            return self._handle_universal_revenue_query(clean_q, q_lower)
 
-        # 17. Defective Quality
-        elif any(k in q_lower for k in ["chất lượng", "lỗi", "eco laptop", "hỏng"]):
-            return self._handle_quality_query(clean_q, q_lower)
-
-        # 18. General Financials
-        elif any(k in q_lower for k in ["doanh thu", "lợi nhuận", "p&l", "tài chính", "cogs", "giá vốn", "revenue", "profit"]):
+        # 26. General Financials
+        if any(k in q_lower for k in ["lợi nhuận", "p&l", "tài chính", "cogs", "giá vốn", "profit"]):
             return self._handle_financial_query(clean_q, q_lower)
 
-        # Fallback
-        else:
-            return self._handle_general_query(clean_q, q_lower)
+        # Final Fallback
+        return self._handle_general_query(clean_q, q_lower)
 
     # =========================================================================
     # Additional Dynamic Domain Handlers

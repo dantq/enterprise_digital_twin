@@ -912,8 +912,18 @@ function openBentoView() {
 
 // ── Bento KPI Sync ──────────────────────────────────────────
 function syncBentoValues() {
-  var ordEl = document.getElementById('val-total-orders'), slaEl = document.getElementById('val-on-time-sla'), csatEl = document.getElementById('val-avg-csat'), b;
-  b = document.getElementById('bento-revenue');  if (b) b.textContent = '84.66 Tỷ';
+  var revEl = document.getElementById('val-net-revenue'),
+      ordEl = document.getElementById('val-total-orders'),
+      slaEl = document.getElementById('val-ontime-rate'),
+      csatEl = document.getElementById('val-avg-csat'),
+      b;
+  if (revEl && revEl.textContent) {
+    var raw = revEl.textContent.replace(/[^\d]/g, '');
+    if (raw) {
+      b = document.getElementById('bento-revenue');
+      if (b) b.textContent = (parseFloat(raw) / 1e9).toFixed(2) + ' Tỷ';
+    }
+  }
   if (ordEl)  { b = document.getElementById('bento-orders'); if (b) b.textContent = ordEl.textContent.split(' ')[0]; }
   if (slaEl)  { b = document.getElementById('bento-sla');    if (b) b.textContent = slaEl.textContent; }
   if (csatEl) { b = document.getElementById('bento-csat');   if (b) b.textContent = csatEl.textContent.replace(' ★',''); }

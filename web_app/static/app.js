@@ -3314,19 +3314,19 @@ function initDefaultArtifacts() {
     title: 'BÁO CÁO VẬN HÀNH & KẾT QUẢ KINH DOANH THÁNG 08/2026',
     generated_at: new Date().toLocaleString('vi-VN'),
     domain: 'C-Suite Executive Governance',
-    summary: 'Bản tin tổng hợp điều hành toàn diện OMNICORP HOLDINGS: Doanh thu tích lũy đạt 84.66 Tỷ VND với 3,183 đơn hàng. SLA giao hàng đạt 39.3% do biến cố logistics Sóng Thần, CSAT duy trì 3.29/5.0. Toàn bộ 5 sự cố lịch sử đã được kiểm toán 100% qua Hội đồng 6 Tác nhân.',
+    summary: 'Bản tin tổng hợp điều hành toàn diện OMNICORP HOLDINGS: Doanh thu tích lũy đạt ~135.90 Tỷ VND với 5,490+ đơn hàng. Toàn bộ 5 sự cố lịch sử (S001–S005) đã được kiểm toán 100% qua Hội đồng 6 Tác nhân AI đối kháng và thẩm định độc lập qua Ground Truth.',
     kpis: [
-      { label: 'Doanh thu Thuần', value: '84.66 Tỷ VND' },
-      { label: 'Quy mô Đơn hàng', value: '3,183 Đơn' },
-      { label: 'Tỷ lệ Giao đúng hạn', value: '39.3%' },
+      { label: 'Doanh thu Thuần', value: '135.90 Tỷ VND' },
+      { label: 'Quy mô Đơn hàng', value: '5,491 Đơn' },
+      { label: 'Tỷ lệ Giao đúng hạn', value: '41.2%' },
       { label: 'Sự cố Đang giám sát', value: '0 Sự cố' }
     ],
     table_headers: ['Chỉ số Vận hành', 'Giá trị', 'Trạng thái', 'Đánh giá'],
     table_rows: [
-      ['Doanh thu Ghi nhận', '84,663,382,325 VND', 'Ổn định', 'Đạt 94% kế hoạch tháng'],
-      ['Thanh toán Thành công', '81.6%', 'Bình thường', 'Khắc phục sự cố MoMo'],
-      ['Giao hàng Đúng hạn (SLA)', '39.3%', 'Cảnh báo', 'Ảnh hưởng từ nghẽn GHN'],
-      ['Điểm CSAT Trung bình', '3.29 / 5.0', 'Trung bình', 'Cải thiện sau khi đổi linh kiện'],
+      ['Doanh thu Ghi nhận', '135,904,580,643 VND', 'Tăng trưởng', 'Đạt 98% kế hoạch luỹ kế'],
+      ['Thanh toán Thành công', '82.4%', 'Bình thường', 'Ổn định sau phục hồi cổng MoMo'],
+      ['Giao hàng Đúng hạn (SLA)', '41.2%', 'Cảnh báo', 'Giải tỏa dứt điểm bưu cục GHN'],
+      ['Điểm CSAT Trung bình', '3.31 / 5.0', 'Trung bình', 'Cải thiện sau khi xử lý pin Eco Laptop'],
       ['Sự cố Nghiệp vụ Đang mở', '0 Sự cố', 'Tốt', 'Khắc phục hoàn tất 100%']
     ],
     recommendations: [
