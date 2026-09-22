@@ -2622,16 +2622,30 @@ class NLQueryEngine:
         peak_date = peak_row["order_date"] if peak_row else "N/A"
         peak_rev = float(peak_row["daily_revenue"]) if peak_row else 0.0
 
-        answer = (
-            f"💰 **Báo cáo Doanh thu & Kết quả Hoạt động Tháng {target_month:02d}/{target_year}**:\n\n"
-            f"• **Doanh thu thuần thực nhận (Net Revenue)**: **{net_rev:,.2f} VND** từ {succ_orders:,} đơn hàng thành công.\n"
-            f"• **Tổng doanh số đặt mua (Gross Sales)**: **{gross_sales:,.2f} VND** từ {tot_orders:,} đơn hàng phát sinh.\n"
-            f"• **Giá vốn hàng bán (COGS)**: **{cogs_val:,.2f} VND** | **Lợi nhuận gộp**: **{gross_profit:,.2f} VND** (Biên lãi: **{gm_pct:.1f}%**).\n"
-            f"• **Tỷ lệ giao hàng hoàn tất**: **{succ_pct:.1f}%** ({canc_orders:,} đơn bị hủy / hoàn tiền).\n"
-            f"• **Giá trị trung bình/đơn (AOV)**: **{aov:,.2f} VND**.\n"
-            f"• **Kênh dẫn đầu**: **{top_channel}** đóng góp **{top_ch_rev:,.2f} VND**.\n"
-            f"• **Ngày đỉnh điểm doanh thu**: Ngày **{peak_date}** đạt **{peak_rev:,.2f} VND**."
-        )
+        if tot_orders == 0:
+            check_prev = execute_analyst_query(f"SELECT COUNT(*) AS c, COALESCE(SUM(total_amount), 0) AS rev FROM orders WHERE EXTRACT(MONTH FROM order_timestamp) = {target_month} AND EXTRACT(YEAR FROM order_timestamp) = 2025")
+            prev_note = ""
+            if check_prev and int(check_prev[0]["c"]) > 0:
+                prev_rev = float(check_prev[0]["rev"])
+                prev_note = f"\n\n💡 **Dữ liệu Lịch sử Đối chiếu**: Tháng {target_month:02d}/{target_year} chưa diễn ra trong chu kỳ mô phỏng hiện tại (mốc hiện tại là cuối tháng 09/2026). Tuy nhiên, kỳ lịch sử **Tháng {target_month:02d}/2025** đã ghi nhận **{int(check_prev[0]['c'])} đơn hàng** với tổng doanh thu đạt **{prev_rev:,.2f} VND**."
+
+            answer = (
+                f"⏱️ **Thông báo Chu kỳ Vận hành: Tháng {target_month:02d}/{target_year}**:\n\n"
+                f"• **Trạng thái**: Tháng {target_month:02d}/{target_year} nằm trong tương lai so với mốc tiến trình hiện tại của bản sao số doanh nghiệp (Tháng 09/2026), hiện chưa phát sinh đơn hàng thực tế."
+                f"{prev_note}\n\n"
+                f"• **Khuyến nghị**: Ban điều hành có thể kích hoạt mô-đun **Mô phỏng Dự báo / What-If** hoặc xem lại kỳ Tháng {target_month:02d}/2025 để lập kế hoạch ngân sách."
+            )
+        else:
+            answer = (
+                f"💰 **Báo cáo Doanh thu & Kết quả Hoạt động Tháng {target_month:02d}/{target_year}**:\n\n"
+                f"• **Doanh thu thuần thực nhận (Net Revenue)**: **{net_rev:,.2f} VND** từ {succ_orders:,} đơn hàng thành công.\n"
+                f"• **Tổng doanh số đặt mua (Gross Sales)**: **{gross_sales:,.2f} VND** từ {tot_orders:,} đơn hàng phát sinh.\n"
+                f"• **Giá vốn hàng bán (COGS)**: **{cogs_val:,.2f} VND** | **Lợi nhuận gộp**: **{gross_profit:,.2f} VND** (Biên lãi: **{gm_pct:.1f}%**).\n"
+                f"• **Tỷ lệ giao hàng hoàn tất**: **{succ_pct:.1f}%** ({canc_orders:,} đơn bị hủy / hoàn tiền).\n"
+                f"• **Giá trị trung bình/đơn (AOV)**: **{aov:,.2f} VND**.\n"
+                f"• **Kênh dẫn đầu**: **{top_channel}** đóng góp **{top_ch_rev:,.2f} VND**.\n"
+                f"• **Ngày đỉnh điểm doanh thu**: Ngày **{peak_date}** đạt **{peak_rev:,.2f} VND**."
+            )
 
         data = [
             {
