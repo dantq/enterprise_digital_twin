@@ -37,6 +37,7 @@ scratch/
 
 # Database backups — NEVER commit ground truth data
 *.sql
+!setup_rbac.sql
 *.dump
 *.backup
 pg_dump_*
