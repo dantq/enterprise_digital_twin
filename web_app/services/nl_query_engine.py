@@ -454,8 +454,8 @@ class NLQueryEngine:
             "#06b6d4", "#10b981", "#8b5cf6", "#f59e0b", "#f43f5e", "#3b82f6", "#a855f7"
         ]
 
-        chart_artifact = None
-        report_artifact = None
+        chart_artifact = result.get("chart_artifact") or (result.get("available_artifacts", {}).get("chart") if isinstance(result.get("available_artifacts"), dict) else None)
+        report_artifact = result.get("report_artifact") or (result.get("available_artifacts", {}).get("report") if isinstance(result.get("available_artifacts"), dict) else None)
 
         if data and isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
             first_row = data[0]
@@ -472,7 +472,11 @@ class NLQueryEngine:
                 except Exception:
                     return None
 
-            if len(keys) >= 2:
+            is_kpi_table = any(k.lower().strip() in [
+                "chỉ số", "chỉ số tài chính", "chỉ số vận hành", "kpi", "tiêu chí", "metric"
+            ] for k in keys)
+
+            if len(keys) >= 2 and not chart_artifact and not is_kpi_table:
                 label_key = keys[0]
                 metric_keys = [k for k in keys[1:] if any(_clean_num(row.get(k)) is not None for row in data)]
                 if not metric_keys:
@@ -508,29 +512,30 @@ class NLQueryEngine:
                     }],
                 }
 
-            # Build Report Artifact
-            kpis = []
-            for row in data[:4]:
-                kpis.append({
-                    "label": str(row.get(keys[0], "")),
-                    "value": str(row.get(keys[1] if len(keys) > 1 else keys[0], "")),
-                })
+            # Build Report Artifact if not already provided
+            if not report_artifact:
+                kpis = []
+                for row in data[:4]:
+                    kpis.append({
+                        "label": str(row.get(keys[0], "")),
+                        "value": str(row.get(keys[1] if len(keys) > 1 else keys[0], "")),
+                    })
 
-            report_artifact = {
-                "type": "report",
-                "title": f"Báo cáo Điều hành: {clean_q.strip().capitalize()}",
-                "domain": result.get("domain", "Executive Intelligence"),
-                "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "summary": result.get("answer", ""),
-                "kpis": kpis,
-                "table_headers": keys,
-                "table_rows": [[str(row.get(k, "")) for k in keys] for row in data],
-                "recommendations": [
-                    "Duy trì giám sát sát sao các biến động trên 10% trong vòng 24h tới.",
-                    "Kích hoạt cơ chế định tuyến thông minh khi phát hiện SLA giảm sút dưới ngưỡng tiêu chuẩn.",
-                    "Đối chiếu dữ liệu đối soát tài khóa định kỳ vào cuối mỗi ca làm việc."
-                ]
-            }
+                report_artifact = {
+                    "type": "report",
+                    "title": f"Báo cáo Điều hành: {clean_q.strip().capitalize()}",
+                    "domain": result.get("domain", "Executive Intelligence"),
+                    "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "summary": result.get("answer", ""),
+                    "kpis": kpis,
+                    "table_headers": keys,
+                    "table_rows": [[str(row.get(k, "")) for k in keys] for row in data],
+                    "recommendations": [
+                        "Duy trì giám sát sát sao các biến động trên 10% trong vòng 24h tới.",
+                        "Kích hoạt cơ chế định tuyến thông minh khi phát hiện SLA giảm sút dưới ngưỡng tiêu chuẩn.",
+                        "Đối chiếu dữ liệu đối soát tài khóa định kỳ vào cuối mỗi ca làm việc."
+                    ]
+                }
 
         # Assign primary artifact
         if is_chart_requested and chart_artifact:
@@ -864,7 +869,21 @@ class NLQueryEngine:
         if any(k in q_lower for k in ["giá trị cao", "đơn hàng lớn", "50 triệu", "100 triệu", "đơn hàng trên"]):
             return self._handle_high_value_orders_query(clean_q, q_lower)
 
-        # 24. Universal Orders Engine (Fallback for general order questions)
+        # 24. Monthly Performance, Revenue & Operational Intelligence
+        # Handles: "tháng 9", "tháng 8", "doanh thu tháng 8", "biểu đồ doanh thu tháng 8", "kết quả tháng 9", "báo cáo tháng 8", etc.
+        month_match = re.search(r"(?:tháng|thang)\s*(\d{1,2})", q_lower)
+        if month_match and not any(k in q_lower for k in [
+            "sự cố", "ghn", "momo", "tiktok", "laptop", "viet electronics",
+            "nhà cung cấp", "linh kiện", "trạm", "bưu cục", "kho", "voucher"
+        ]):
+            m_num = int(month_match.group(1))
+            if 1 <= m_num <= 12:
+                all_m = [int(x) for x in re.findall(r"(?:tháng|thang)\s*(\d{1,2})", q_lower)]
+                if len(all_m) >= 2 and any(k in q_lower for k in ["so sánh", "so voi", "với", "và", "tang truong", "tăng trưởng", "biến động", "thay đổi"]):
+                    return self._handle_financial_query(clean_q, q_lower)
+                return self._handle_monthly_performance_query(clean_q, q_lower, m_num)
+
+        # 25. Universal Orders Engine (Fallback for general order questions)
         if any(k in q_lower for k in [
             "đơn hàng", "don hang", "đơn mới", "đơn lớn", "đơn nhỏ", "đơn gần", "đơn vừa",
             "mới nhất là gì", "mới nhất", "gần nhất", "giá trị nhất", "lớn nhất", "nhỏ nhất",
@@ -2514,6 +2533,191 @@ class NLQueryEngine:
             ],
         }
 
+    def _handle_monthly_performance_query(self, clean_q: str, q_lower: str, target_month: int, target_year: int = 2026) -> Dict[str, Any]:
+        """Comprehensive Monthly Intelligence Engine: P&L metrics, operational volume, daily trend chart & executive report."""
+        year_match = re.search(r"(?:năm\s*)?(202[5-6])", q_lower)
+        if year_match:
+            target_year = int(year_match.group(1))
+
+        # Check if 2026 has orders for this month, otherwise fallback to any year or 2025
+        check_sql = f"SELECT COUNT(*) AS c FROM orders WHERE EXTRACT(MONTH FROM order_timestamp) = {target_month} AND EXTRACT(YEAR FROM order_timestamp) = {target_year}"
+        check_res = execute_analyst_query(check_sql)
+        if check_res and int(check_res[0]["c"]) == 0 and not year_match:
+            check_2025 = execute_analyst_query(f"SELECT COUNT(*) AS c FROM orders WHERE EXTRACT(MONTH FROM order_timestamp) = {target_month} AND EXTRACT(YEAR FROM order_timestamp) = 2025")
+            if check_2025 and int(check_2025[0]["c"]) > 0:
+                target_year = 2025
+
+        sql = """
+            SELECT 
+                COUNT(o.order_id) AS total_orders,
+                COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN 1 END) AS successful_orders,
+                COUNT(CASE WHEN o.order_status = 'Cancelled' THEN 1 END) AS cancelled_orders,
+                COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN o.total_amount ELSE 0 END), 0) AS net_revenue,
+                COALESCE(SUM(o.total_amount), 0) AS gross_sales,
+                COALESCE(SUM(o.discount_amount), 0) AS total_discounts,
+                COALESCE(AVG(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN o.total_amount END), 0) AS aov
+            FROM orders o
+            WHERE EXTRACT(MONTH FROM o.order_timestamp) = %s 
+              AND EXTRACT(YEAR FROM o.order_timestamp) = %s;
+        """
+        rows = execute_analyst_query(sql, (target_month, target_year))
+        m_row = rows[0] if rows else {}
+        net_rev = float(m_row.get("net_revenue", 0.0))
+        gross_sales = float(m_row.get("gross_sales", 0.0))
+        discounts = float(m_row.get("total_discounts", 0.0))
+        tot_orders = int(m_row.get("total_orders", 0))
+        succ_orders = int(m_row.get("successful_orders", 0))
+        canc_orders = int(m_row.get("cancelled_orders", 0))
+        aov = float(m_row.get("aov", 0.0))
+
+        # Query COGS for this specific month
+        cogs_sql = """
+            SELECT COALESCE(SUM(oi.quantity * p.unit_cost), 0) AS cogs
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.order_id
+            JOIN products p ON oi.product_id = p.product_id
+            WHERE o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid')
+              AND EXTRACT(MONTH FROM o.order_timestamp) = %s 
+              AND EXTRACT(YEAR FROM o.order_timestamp) = %s;
+        """
+        cogs_rows = execute_analyst_query(cogs_sql, (target_month, target_year))
+        cogs_val = float(cogs_rows[0]["cogs"]) if cogs_rows else 0.0
+        gross_profit = net_rev - cogs_val
+        gm_pct = (gross_profit / net_rev * 100.0) if net_rev > 0 else 0.0
+        succ_pct = (succ_orders / tot_orders * 100.0) if tot_orders > 0 else 0.0
+
+        # Query Daily Time-Series
+        sql_daily = """
+            SELECT 
+                TO_CHAR(o.order_timestamp, 'YYYY-MM-DD') AS order_date,
+                COUNT(o.order_id) AS daily_orders,
+                COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN 1 END) AS daily_successful,
+                COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN o.total_amount ELSE 0 END), 0) AS daily_revenue
+            FROM orders o
+            WHERE EXTRACT(MONTH FROM o.order_timestamp) = %s 
+              AND EXTRACT(YEAR FROM o.order_timestamp) = %s
+            GROUP BY TO_CHAR(o.order_timestamp, 'YYYY-MM-DD')
+            ORDER BY order_date ASC;
+        """
+        daily_rows = execute_analyst_query(sql_daily, (target_month, target_year))
+
+        # Channel contribution
+        sql_channel = """
+            SELECT 
+                o.channel,
+                COUNT(o.order_id) AS ch_orders,
+                COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN o.total_amount ELSE 0 END), 0) AS ch_rev
+            FROM orders o
+            WHERE EXTRACT(MONTH FROM o.order_timestamp) = %s 
+              AND EXTRACT(YEAR FROM o.order_timestamp) = %s
+            GROUP BY o.channel
+            ORDER BY ch_rev DESC
+            LIMIT 1;
+        """
+        ch_rows = execute_analyst_query(sql_channel, (target_month, target_year))
+        top_channel = ch_rows[0]["channel"] if ch_rows else "Trực tuyến"
+        top_ch_rev = float(ch_rows[0]["ch_rev"]) if ch_rows else 0.0
+
+        peak_row = max(daily_rows, key=lambda x: float(x["daily_revenue"])) if daily_rows else None
+        peak_date = peak_row["order_date"] if peak_row else "N/A"
+        peak_rev = float(peak_row["daily_revenue"]) if peak_row else 0.0
+
+        answer = (
+            f"💰 **Báo cáo Doanh thu & Kết quả Hoạt động Tháng {target_month:02d}/{target_year}**:\n\n"
+            f"• **Doanh thu thuần thực nhận (Net Revenue)**: **{net_rev:,.2f} VND** từ {succ_orders:,} đơn hàng thành công.\n"
+            f"• **Tổng doanh số đặt mua (Gross Sales)**: **{gross_sales:,.2f} VND** từ {tot_orders:,} đơn hàng phát sinh.\n"
+            f"• **Giá vốn hàng bán (COGS)**: **{cogs_val:,.2f} VND** | **Lợi nhuận gộp**: **{gross_profit:,.2f} VND** (Biên lãi: **{gm_pct:.1f}%**).\n"
+            f"• **Tỷ lệ giao hàng hoàn tất**: **{succ_pct:.1f}%** ({canc_orders:,} đơn bị hủy / hoàn tiền).\n"
+            f"• **Giá trị trung bình/đơn (AOV)**: **{aov:,.2f} VND**.\n"
+            f"• **Kênh dẫn đầu**: **{top_channel}** đóng góp **{top_ch_rev:,.2f} VND**.\n"
+            f"• **Ngày đỉnh điểm doanh thu**: Ngày **{peak_date}** đạt **{peak_rev:,.2f} VND**."
+        )
+
+        data = [
+            {
+                "Ngày": r["order_date"],
+                "Tổng số đơn": int(r["daily_orders"]),
+                "Đơn thành công": int(r["daily_successful"]),
+                "Doanh thu thuần (VND)": f"{float(r['daily_revenue']):,.2f}",
+            }
+            for r in daily_rows
+        ]
+        if not data:
+            data = [
+                {"Chỉ số tài chính": f"Doanh thu thuần Tháng {target_month:02d}/{target_year}", "Giá trị (VND)": f"{net_rev:,.2f}"},
+                {"Chỉ số tài chính": "Doanh số gộp (Gross Sales)", "Giá trị (VND)": f"{gross_sales:,.2f}"},
+                {"Chỉ số tài chính": "Giá vốn hàng bán (COGS)", "Giá trị (VND)": f"-{cogs_val:,.2f}"},
+                {"Chỉ số tài chính": "Lợi nhuận gộp (Gross Profit)", "Giá trị (VND)": f"{gross_profit:,.2f}"},
+                {"Chỉ số tài chính": "Tổng đơn hoàn tất", "Giá trị (VND)": f"{succ_orders:,} đơn / {tot_orders:,} đơn"},
+            ]
+
+        # Dedicated high-impact Chart Artifact
+        labels = [r["order_date"] for r in daily_rows]
+        values = [float(r["daily_revenue"]) for r in daily_rows]
+        chart_artifact = {
+            "type": "chart",
+            "chart_type": "line",
+            "title": f"Biểu đồ Doanh thu Tháng {target_month:02d}/{target_year}",
+            "subtitle": f"Diễn biến doanh thu thuần theo ngày ({len(daily_rows)} mốc giao dịch)",
+            "label_key": "Ngày",
+            "metric_key": "Doanh thu thuần (VND)",
+            "labels": labels,
+            "datasets": [
+                {
+                    "label": "Doanh thu thuần (VND)",
+                    "data": values,
+                    "borderColor": "#00f2fe",
+                    "backgroundColor": "rgba(0, 242, 254, 0.15)",
+                    "borderWidth": 2,
+                    "fill": True,
+                    "tension": 0.25,
+                }
+            ],
+        }
+
+        # Dedicated Executive Report Artifact
+        report_artifact = {
+            "type": "report",
+            "title": f"Báo cáo Điều hành Tháng {target_month:02d}/{target_year}",
+            "domain": "Finance & Operations",
+            "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "summary": answer,
+            "kpis": [
+                {"label": f"Doanh thu thuần T{target_month:02d}", "value": f"{net_rev:,.2f} VND"},
+                {"label": "Tổng quy mô đơn", "value": f"{tot_orders:,} đơn"},
+                {"label": "Tỷ lệ hoàn tất", "value": f"{succ_pct:.1f}%"},
+                {"label": "Giá trị TB (AOV)", "value": f"{aov:,.2f} VND"},
+            ],
+            "table_headers": ["Ngày", "Tổng số đơn", "Đơn thành công", "Doanh thu thuần (VND)"],
+            "table_rows": [[r["order_date"], str(r["daily_orders"]), str(r["daily_successful"]), f"{float(r['daily_revenue']):,.2f}"] for r in daily_rows],
+            "recommendations": [
+                f"Đẩy mạnh các chương trình khuyến mại kích cầu tập trung vào kênh {top_channel}.",
+                "Kiểm soát tỷ lệ giao trễ và hủy đơn hàng trong các khung giờ cao điểm.",
+                "Tối ưu tồn kho đệm tại các kho hàng trọng điểm để đón sóng nhu cầu kế tiếp.",
+            ],
+        }
+
+        return {
+            "question": clean_q,
+            "status": "SUCCESS",
+            "mode": "UniversalSemanticEngine",
+            "domain": "Finance",
+            "answer": answer,
+            "sql_query": sql_daily.strip().replace("%s", str(target_month)),
+            "data": data,
+            "chart_artifact": chart_artifact,
+            "report_artifact": report_artifact,
+            "available_artifacts": {
+                "chart": chart_artifact,
+                "report": report_artifact,
+            },
+            "suggested_followups": [
+                f"So sánh doanh thu tháng {target_month} với tháng {8 if target_month != 8 else 9}",
+                "Báo cáo kết quả kinh doanh P&L toàn diện",
+                "Cơ cấu doanh thu theo từng kênh bán hàng",
+            ],
+        }
+
     def _handle_financial_query(self, clean_q: str, q_lower: str) -> Dict[str, Any]:
         # Check if comparing two months (e.g. "so sánh doanh thu tháng 7 với tháng 8/2026", "tháng 7 và tháng 8")
         all_months = [int(m) for m in re.findall(r"tháng\s*(\d{1,2})", q_lower)]
@@ -2537,76 +2741,7 @@ class NLQueryEngine:
             year_match = re.search(r"(?:năm\s*)?(202[5-6])", q_lower)
             if year_match:
                 target_year = int(year_match.group(1))
-
-            sql = """
-                SELECT 
-                    COUNT(o.order_id) AS total_orders,
-                    COUNT(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN 1 END) AS successful_orders,
-                    COUNT(CASE WHEN o.order_status = 'Cancelled' THEN 1 END) AS cancelled_orders,
-                    COALESCE(SUM(CASE WHEN o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid') THEN o.total_amount ELSE 0 END), 0) AS net_revenue,
-                    COALESCE(SUM(o.total_amount), 0) AS gross_sales,
-                    COALESCE(SUM(o.discount_amount), 0) AS total_discounts
-                FROM orders o
-                WHERE EXTRACT(MONTH FROM o.order_timestamp) = %s 
-                  AND EXTRACT(YEAR FROM o.order_timestamp) = %s;
-            """
-            rows = execute_analyst_query(sql, (target_month, target_year))
-            m_row = rows[0] if rows else {}
-            net_rev = float(m_row.get("net_revenue", 0.0))
-            gross_sales = float(m_row.get("gross_sales", 0.0))
-            discounts = float(m_row.get("total_discounts", 0.0))
-            tot_orders = int(m_row.get("total_orders", 0))
-            succ_orders = int(m_row.get("successful_orders", 0))
-            canc_orders = int(m_row.get("cancelled_orders", 0))
-
-            # Query COGS for this specific month
-            cogs_sql = """
-                SELECT COALESCE(SUM(oi.quantity * p.unit_cost), 0) AS cogs
-                FROM order_items oi
-                JOIN orders o ON oi.order_id = o.order_id
-                JOIN products p ON oi.product_id = p.product_id
-                WHERE o.order_status IN ('Delivered', 'Shipped', 'Fulfilled', 'Paid')
-                  AND EXTRACT(MONTH FROM o.order_timestamp) = %s 
-                  AND EXTRACT(YEAR FROM o.order_timestamp) = %s;
-            """
-            cogs_rows = execute_analyst_query(cogs_sql, (target_month, target_year))
-            cogs_val = float(cogs_rows[0]["cogs"]) if cogs_rows else 0.0
-            gross_profit = net_rev - cogs_val
-            gm_pct = (gross_profit / net_rev * 100.0) if net_rev > 0 else 0.0
-
-            answer = (
-                f"**Báo cáo Doanh thu & Kết quả Kinh doanh Tháng {target_month:02d}/{target_year}**:\n\n"
-                f"• **Doanh thu thuần thực nhận (Net Revenue)**: **{net_rev:,.2f} VND** từ {succ_orders} đơn hàng giao hoàn tất.\n"
-                f"• **Tổng doanh số đặt mua danh nghĩa (Gross Sales)**: **{gross_sales:,.2f} VND** từ {tot_orders} đơn hàng phát sinh.\n"
-                f"• **Chiết khấu & Giảm giá**: **{discounts:,.2f} VND**.\n"
-                f"• **Giá vốn hàng bán (COGS)**: **{cogs_val:,.2f} VND**.\n"
-                f"• **Lợi nhuận gộp (Gross Profit)**: **{gross_profit:,.2f} VND** (Biên lãi gộp: **{gm_pct:.2f}%**).\n"
-                f"• **Tỷ lệ hoàn tất đơn hàng**: **{(succ_orders/tot_orders*100 if tot_orders > 0 else 0):.1f}%** ({canc_orders} đơn bị hủy/chưa hoàn tất)."
-            )
-
-            data = [
-                {"Chỉ số tài chính": f"Doanh thu thuần Tháng {target_month:02d}/{target_year}", "Giá trị (VND)": f"{net_rev:,.2f}"},
-                {"Chỉ số tài chính": "Doanh số gộp (Gross Sales)", "Giá trị (VND)": f"{gross_sales:,.2f}"},
-                {"Chỉ số tài chính": "Chiết khấu khuyến mại", "Giá trị (VND)": f"-{discounts:,.2f}"},
-                {"Chỉ số tài chính": "Giá vốn hàng bán (COGS)", "Giá trị (VND)": f"-{cogs_val:,.2f}"},
-                {"Chỉ số tài chính": "Lợi nhuận gộp (Gross Profit)", "Giá trị (VND)": f"{gross_profit:,.2f}"},
-                {"Chỉ số tài chính": "Tổng đơn hoàn tất", "Giá trị (VND)": f"{succ_orders} đơn / {tot_orders} đơn"},
-            ]
-
-            return {
-                "question": clean_q,
-                "status": "SUCCESS",
-                "mode": "UniversalSemanticEngine",
-                "domain": "Finance",
-                "answer": answer,
-                "sql_query": sql.strip().replace("%s", str(target_month)),
-                "data": data,
-                "suggested_followups": [
-                    f"So sánh doanh thu tháng {target_month} với tháng 8/2026",
-                    "Báo cáo kết quả kinh doanh P&L hợp nhất toàn bộ chu kỳ",
-                    "Top 5 sản phẩm bán chạy nhất trong tháng",
-                ],
-            }
+            return self._handle_monthly_performance_query(clean_q, q_lower, target_month, target_year)
 
         pnl = FinancialEngine.get_pnl_statement()
         sql = """

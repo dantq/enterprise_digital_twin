@@ -182,8 +182,8 @@ class DashboardService:
         carrier_sql = """
             SELECT 
                 COUNT(*) AS total_delivered,
-                COUNT(CASE WHEN delivered_timestamp <= estimated_delivery_timestamp THEN 1 END) AS on_time_delivered,
-                ROUND(COUNT(CASE WHEN delivered_timestamp <= estimated_delivery_timestamp THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100, 2) AS on_time_rate
+                COUNT(CASE WHEN DATE(delivered_timestamp) <= DATE(estimated_delivery_timestamp) THEN 1 END) AS on_time_delivered,
+                ROUND(COUNT(CASE WHEN DATE(delivered_timestamp) <= DATE(estimated_delivery_timestamp) THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100, 2) AS on_time_rate
             FROM shipments
             WHERE shipment_status = 'Delivered' AND delivered_timestamp IS NOT NULL;
         """
@@ -307,8 +307,9 @@ class DashboardService:
                 c.carrier_id,
                 c.carrier_name,
                 COUNT(s.shipment_id) AS total_shipments,
-                COUNT(CASE WHEN s.shipment_status = 'Delivered' AND s.delivered_timestamp <= s.estimated_delivery_timestamp THEN 1 END) AS on_time_count,
-                COUNT(CASE WHEN s.shipment_status = 'Delivered' AND s.delivered_timestamp > s.estimated_delivery_timestamp THEN 1 END) AS delayed_count,
+                COUNT(CASE WHEN s.shipment_status = 'Delivered' THEN 1 END) AS delivered_count,
+                COUNT(CASE WHEN s.shipment_status = 'Delivered' AND DATE(s.delivered_timestamp) <= DATE(s.estimated_delivery_timestamp) THEN 1 END) AS on_time_count,
+                COUNT(CASE WHEN s.shipment_status = 'Delivered' AND DATE(s.delivered_timestamp) > DATE(s.estimated_delivery_timestamp) THEN 1 END) AS delayed_count,
                 ROUND(
                     AVG(CASE WHEN s.delivered_timestamp IS NOT NULL THEN 
                         EXTRACT(EPOCH FROM (s.delivered_timestamp - s.shipment_timestamp)) / 86400.0 ELSE NULL END), 2
@@ -322,9 +323,10 @@ class DashboardService:
         results = []
         for r in rows:
             total = int(r["total_shipments"])
+            delivered = int(r["delivered_count"])
             ontime = int(r["on_time_count"])
             delayed = int(r["delayed_count"])
-            ontime_pct = (ontime / total * 100.0) if total > 0 else 0.0
+            ontime_pct = (ontime / delivered * 100.0) if delivered > 0 else 0.0
             results.append({
                 "carrier_id": str(r["carrier_id"]),
                 "carrier_name": r["carrier_name"],
