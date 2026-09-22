@@ -837,7 +837,7 @@ class EnterpriseStreamingEngine:
                             uuid.uuid4(),
                             now,
                             "COGS",
-                            cogs_amt,
+                            -cogs_amt,
                             "VND",
                             order_id,
                             f"COGS-{uuid.uuid4().hex[:8].upper()}",
@@ -870,13 +870,16 @@ class EnterpriseStreamingEngine:
         if item["carrier_id"] and item["warehouse_id"] and item["order_status"] != "Cancelled":
             ship_id = uuid.uuid4()
             ship_status = "Delivered" if item["channel"] == "Store" else "InTransit"
+            est_del = now + (timedelta(hours=2) if ship_status == "Delivered" else timedelta(days=3))
+            del_ts = est_del if ship_status == "Delivered" else None
             cur.execute(
                 """
                 INSERT INTO shipments (
                     shipment_id, order_id, warehouse_id, carrier_id,
-                    shipment_timestamp, shipment_status, tracking_number
+                    shipment_timestamp, estimated_delivery_timestamp, delivered_timestamp,
+                    shipment_status, tracking_number
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     ship_id,
@@ -884,21 +887,43 @@ class EnterpriseStreamingEngine:
                     item["warehouse_id"],
                     item["carrier_id"],
                     now,
+                    est_del,
+                    del_ts,
                     ship_status,
                     f"TRK-{uuid.uuid4().hex[:8].upper()}",
                 ),
             )
 
-            # Shipment Status History (Created -> PickedUp -> InTransit)
+            # Shipment Status History (PickedUp -> InTransit / Delivered)
             cur.execute(
                 """
                 INSERT INTO shipment_status_history (
                     shipment_status_history_id, shipment_id, status, status_timestamp
                 )
-                VALUES (%s, %s, %s, %s)
+                VALUES (%s, %s, 'PickedUp', %s)
                 """,
-                (uuid.uuid4(), ship_id, "PickedUp", now + timedelta(seconds=3)),
+                (uuid.uuid4(), ship_id, now + timedelta(seconds=3)),
             )
+            if ship_status == "InTransit":
+                cur.execute(
+                    """
+                    INSERT INTO shipment_status_history (
+                        shipment_status_history_id, shipment_id, status, status_timestamp
+                    )
+                    VALUES (%s, %s, 'InTransit', %s)
+                    """,
+                    (uuid.uuid4(), ship_id, now + timedelta(seconds=10)),
+                )
+            elif ship_status == "Delivered":
+                cur.execute(
+                    """
+                    INSERT INTO shipment_status_history (
+                        shipment_status_history_id, shipment_id, status, status_timestamp
+                    )
+                    VALUES (%s, %s, 'Delivered', %s)
+                    """,
+                    (uuid.uuid4(), ship_id, del_ts),
+                )
 
     def _insert_behavior_event(self, cur, item: Dict[str, Any]):
         """Persists customer web/app behavior event."""
